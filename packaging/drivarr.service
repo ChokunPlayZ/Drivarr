@@ -1,0 +1,32 @@
+[Unit]
+Description=Drivarr drive diagnostics daemon
+Documentation=https://localhost:8787
+After=local-fs.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+EnvironmentFile=-/etc/default/drivarr
+ExecStart=/usr/bin/drivarrd --listen ${DRIVARR_LISTEN} --data-dir /var/lib/drivarr
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+UMask=0027
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/drivarr
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
+

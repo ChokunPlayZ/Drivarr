@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+install -d -o root -g root -m 0750 /var/lib/drivarr
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl enable drivarr.service >/dev/null 2>&1 || true
+if [ "$1" = "configure" ]; then
+  systemctl restart drivarr.service >/dev/null 2>&1 || true
+fi
+

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6750a4" />
+    <title>Drivarr</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div id="login-view" class="login-shell">
+      <form id="login-form" class="login-card">
+        <div class="brand-mark large" aria-hidden="true">D</div>
+        <p class="eyebrow">Drive diagnostics</p>
+        <h1>Welcome to Drivarr</h1>
+        <p class="supporting">Sign in to inspect and test this host’s physical drives.</p>
+        <label>Username<input name="username" autocomplete="username" required value="admin" /></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+        <p id="login-error" class="form-error" hidden></p>
+        <button class="filled" type="submit">Sign in</button>
+      </form>
+    </div>
+    <div id="app-view" hidden>
+      <header>
+        <div class="brand-mark" aria-hidden="true">D</div>
+        <div><h1>Drivarr</h1><p>Drive diagnostics</p></div>
+        <span id="daemon-state" class="status status-neutral">Connecting</span>
+        <button id="user-menu" class="text-button">Sign out</button>
+      </header>
+      <div class="app-layout">
+        <nav aria-label="Primary">
+          <button class="nav-item active" data-page="dashboard">Overview</button>
+          <button class="nav-item" data-page="devices">Drives</button>
+          <button class="nav-item" data-page="jobs">Tests</button>
+          <button class="nav-item" data-page="reports">Reports</button>
+          <button class="nav-item admin-only" data-page="admin">Administration</button>
+        </nav>
+        <main>
+          <div id="notice" class="notice" hidden></div>
+          <section class="page active" data-page="dashboard">
+            <div class="hero">
+              <div>
+                <p class="eyebrow">Hardware safety</p>
+                <h2>Diagnostics that don’t go down with the drive.</h2>
+                <p class="supporting">Every hardware request is isolated, deadline-bound, and quarantined if it stops responding.</p>
+              </div>
+              <button id="refresh" class="filled">Refresh drives</button>
+            </div>
+            <div id="summary" class="summary-grid"></div>
+            <div class="section-heading"><div><p class="eyebrow">Activity</p><h2>Recent tests</h2></div><span id="updated">Not updated yet</span></div>
+            <div id="recent-jobs"></div>
+          </section>
+          <section class="page" data-page="devices">
+            <div class="section-heading"><div><p class="eyebrow">This host</p><h2>Physical drives</h2></div><button id="refresh-devices" class="tonal">Refresh</button></div>
+            <div id="devices" class="device-grid" aria-live="polite"></div>
+          </section>
+          <section class="page" data-page="jobs">
+            <div class="section-heading"><div><p class="eyebrow">Durable queue</p><h2>Tests and scans</h2></div></div>
+            <div id="jobs" class="table-card"></div>
+          </section>
+          <section class="page" data-page="reports">
+            <div class="section-heading"><div><p class="eyebrow">Evidence</p><h2>PDF reports</h2></div></div>
+            <div id="reports" class="table-card"></div>
+          </section>
+          <section class="page" data-page="admin">
+            <div class="section-heading"><div><p class="eyebrow">System</p><h2>Administration</h2></div></div>
+            <div class="admin-grid">
+              <form id="settings-form" class="panel">
+                <h3>Testing policy</h3>
+                <label>Organization<input name="organization" required /></label>
+                <label>Concurrent jobs<input name="maxConcurrentJobs" type="number" min="1" max="32" /></label>
+                <label>Destructive concurrency<input name="maxDestructiveJobs" type="number" min="1" max="32" /></label>
+                <label>Chunk size (MiB)<input name="jobChunkMiB" type="number" min="16" max="4096" /></label>
+                <label>Report retention days (0 = forever)<input name="retentionDays" type="number" min="0" /></label>
+                <label>Report storage limit in bytes (0 = unlimited)<input name="retentionMaxBytes" type="number" min="0" /></label>
+                <label class="check"><input name="destructiveEnabled" type="checkbox" />Enable destructive verification</label>
+                <button class="filled" type="submit">Save settings</button>
+              </form>
+              <form id="user-form" class="panel">
+                <h3>Add user</h3>
+                <label>Username<input name="username" minlength="3" required /></label>
+                <label>Temporary password<input name="password" type="password" minlength="12" required /></label>
+                <label>Role<select name="role"><option value="viewer">Viewer</option><option value="operator">Operator</option><option value="admin">Administrator</option></select></label>
+                <button class="filled" type="submit">Create user</button>
+                <div id="users-list"></div>
+              </form>
+              <form id="password-form" class="panel">
+                <h3>Change my password</h3>
+                <label>Current password<input name="currentPassword" type="password" required /></label>
+                <label>New password<input name="newPassword" type="password" minlength="12" required /></label>
+                <button class="filled" type="submit">Change password</button>
+              </form>
+              <form id="profile-form" class="panel">
+                <h3>Create advanced test profile</h3>
+                <label>Name<input name="name" required /></label>
+                <label>Test type<select name="kind"><option value="speed">Speed test</option><option value="surface_read">Surface read</option><option value="destructive_verify">Destructive verification</option></select></label>
+                <label>Block size (KiB)<input name="blockSizeKiB" type="number" min="4" max="16384" value="1024" /></label>
+                <label>Queue depth<input name="queueDepth" type="number" min="1" max="128" value="1" /></label>
+                <label>Duration seconds<input name="durationSeconds" type="number" min="0" max="86400" value="15" /></label>
+                <label>Rate limit MiB/s (0 = unlimited)<input name="rateMiB" type="number" min="0" value="0" /></label>
+                <button class="filled" type="submit">Create profile</button>
+              </form>
+              <form id="policy-form" class="panel">
+                <h3>Create grading policy</h3>
+                <label>Name<input name="name" required /></label>
+                <label class="check"><input name="failOnSmart" type="checkbox" checked />Fail on SMART health failure</label>
+                <label class="check"><input name="failOnIoError" type="checkbox" checked />Fail on scan I/O error</label>
+                <label>Warn when pending sectors exceed<input name="warnPendingAbove" type="number" min="0" value="0" /></label>
+                <label>Warn when reallocated sectors exceed<input name="warnReallocatedAbove" type="number" min="0" value="0" /></label>
+                <label>Warn when uncorrectable sectors exceed<input name="warnUncorrectableAbove" type="number" min="0" value="0" /></label>
+                <button class="filled" type="submit">Create policy</button>
+              </form>
+            </div>
+            <div class="section-heading"><div><p class="eyebrow">Accountability</p><h2>Audit log</h2></div></div>
+            <div id="audit" class="table-card"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+    <dialog id="test-dialog">
+      <form id="test-form" method="dialog">
+        <div class="dialog-heading"><div><p class="eyebrow">New test</p><h2 id="test-drive-name">Drive</h2></div><button value="cancel" class="icon-button" aria-label="Close">×</button></div>
+        <input name="deviceId" type="hidden" />
+        <label>Test profile<select name="profileId"></select></label>
+        <label>Grading policy<select name="policyId"></select></label>
+        <div id="destructive-warning" class="danger" hidden>
+          <strong>This permanently erases the entire drive.</strong>
+          <label>Type the drive serial to confirm<input name="serialConfirmation" /></label>
+          <label>Re-enter your password<input name="reauthPassword" type="password" autocomplete="current-password" /></label>
+        </div>
+        <div class="dialog-actions"><button value="cancel" class="text-button">Cancel</button><button id="start-test" value="default" class="filled">Start test</button></div>
+      </form>
+    </dialog>
+  </body>
+</html>

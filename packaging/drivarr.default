@@ -1,0 +1,5 @@
+DRIVARR_LISTEN=0.0.0.0:8787
+# Set this before the first start, or read the generated temporary administrator
+# password from: journalctl -u drivarr
+# DRIVARR_BOOTSTRAP_PASSWORD=replace-with-at-least-12-characters
+

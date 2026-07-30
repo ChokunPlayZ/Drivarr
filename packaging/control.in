@@ -1,0 +1,10 @@
+Package: drivarr
+Version: @VERSION@
+Section: admin
+Priority: optional
+Architecture: @ARCH@
+Depends: smartmontools, fio, e2fsprogs, systemd
+Maintainer: Drivarr
+Description: Lockup-resistant web drive diagnostics
+ SMART, Seagate FARM, speed, surface, and destructive verification tests with
+ durable progress, authenticated administration, and PDF reports.

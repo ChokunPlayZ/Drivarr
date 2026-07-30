@@ -1,0 +1,6 @@
+/build/
+/drivarr-data/
+/drivarrd
+*.deb
+*.test
+

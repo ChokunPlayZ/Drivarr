@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: Drivarr API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+paths:
+  /health:
+    get: {summary: Daemon liveness, responses: {'200': {description: Responsive}}}
+  /auth/login:
+    post: {summary: Create a local session, responses: {'200': {description: Signed in}, '401': {description: Invalid credentials}}}
+  /auth/session:
+    get: {summary: Current authenticated user, responses: {'200': {description: Session}}}
+  /devices:
+    get: {summary: Physical drives and current telemetry, responses: {'200': {description: Device list}}}
+  /discovery/refresh:
+    post: {summary: Start isolated drive discovery, responses: {'202': {description: Started}}}
+  /jobs:
+    get: {summary: Test history and progress, responses: {'200': {description: Jobs}}}
+    post: {summary: Queue a test profile, responses: {'201': {description: Job created}}}
+  /jobs/{id}/pause:
+    post:
+      summary: Pause a checkpointable test
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'202': {description: Pause requested}}
+  /jobs/{id}/resume:
+    post:
+      summary: Resume a paused or interrupted test
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'202': {description: Resume requested}}
+  /jobs/{id}/cancel:
+    post:
+      summary: Cancel a test
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'202': {description: Cancellation requested}}
+  /jobs/{id}/report:
+    post:
+      summary: Generate an immutable PDF report
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'201': {description: Report created}}
+  /reports:
+    get: {summary: Issued reports, responses: {'200': {description: Reports}}}
+  /profiles:
+    get: {summary: Built-in and advanced test profiles, responses: {'200': {description: Profiles}}}
+    post: {summary: Create an advanced profile, responses: {'201': {description: Profile created}}}
+  /policies:
+    get: {summary: Versioned grading policies, responses: {'200': {description: Policies}}}
+    post: {summary: Create or revise a policy, responses: {'201': {description: Policy saved}}}
+  /users:
+    get: {summary: Local users, responses: {'200': {description: Users}}}
+    post: {summary: Create a local user, responses: {'201': {description: User created}}}
+  /settings:
+    get: {summary: System settings, responses: {'200': {description: Settings}}}
+    put: {summary: Update system settings, responses: {'200': {description: Settings saved}}}
+  /audit:
+    get: {summary: Append-only audit history, responses: {'200': {description: Events}}}
+
