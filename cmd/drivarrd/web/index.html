@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#6750a4" />
+    <meta name="description" content="Drivarr hardware-safe drive diagnostics and evidence reporting." />
     <title>Drivarr</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="./app.js" defer></script>
@@ -131,6 +132,20 @@
         </div>
         <div class="dialog-actions"><button value="cancel" class="text-button">Cancel</button><button id="start-test" value="default" class="filled">Start test</button></div>
       </form>
+    </dialog>
+    <dialog id="drive-workspace" class="drive-workspace" aria-labelledby="workspace-title">
+      <div class="workspace-bar">
+        <div>
+          <p class="eyebrow">Live drive workspace</p>
+          <h2 id="workspace-title">Drive details</h2>
+          <p id="workspace-path" class="workspace-path"></p>
+        </div>
+        <div class="workspace-bar-actions">
+          <span id="workspace-status"></span>
+          <button class="icon-button" data-close-workspace aria-label="Close full-screen drive view">×</button>
+        </div>
+      </div>
+      <div id="workspace-content" class="workspace-content"></div>
     </dialog>
   </body>
 </html>

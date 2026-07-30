@@ -86,10 +86,15 @@ type smartctlEnvelope struct {
 	} `json:"power_on_time"`
 	ATASMARTAttributes struct {
 		Table []struct {
-			ID   int    `json:"id"`
-			Name string `json:"name"`
-			Raw  struct {
-				Value int64 `json:"value"`
+			ID         int    `json:"id"`
+			Name       string `json:"name"`
+			Value      int64  `json:"value"`
+			Worst      int64  `json:"worst"`
+			Threshold  int64  `json:"thresh"`
+			WhenFailed string `json:"when_failed"`
+			Raw        struct {
+				Value  int64  `json:"value"`
+				String string `json:"string"`
 			} `json:"raw"`
 		} `json:"table"`
 	} `json:"ata_smart_attributes"`
@@ -403,7 +408,14 @@ func workerProbe(device string, output io.Writer) error {
 	fingerprintHash := sha256.Sum256([]byte(fingerprint))
 	id := "dev_" + hex.EncodeToString(fingerprintHash[:8])
 	var reallocated, pending, uncorrectable int64
+	attributes := make([]guard.SMARTAttribute, 0, len(report.ATASMARTAttributes.Table))
 	for _, attribute := range report.ATASMARTAttributes.Table {
+		attributes = append(attributes, guard.SMARTAttribute{
+			ID: attribute.ID, Name: attribute.Name, Current: attribute.Value,
+			Worst: attribute.Worst, Threshold: attribute.Threshold,
+			RawValue: attribute.Raw.Value, RawString: attribute.Raw.String,
+			WhenFailed: attribute.WhenFailed,
+		})
 		switch attribute.ID {
 		case 5:
 			reallocated = attribute.Raw.Value
@@ -425,23 +437,24 @@ func workerProbe(device string, output io.Writer) error {
 		}
 	}
 	return json.NewEncoder(output).Encode(guard.ProbeData{
-		ID:             id,
-		Path:           device,
-		Model:          report.ModelName,
-		Serial:         report.SerialNumber,
-		Firmware:       report.Firmware,
-		Protocol:       report.Device.Protocol,
-		Capacity:       report.UserCapacity.Bytes,
-		SMARTAvailable: report.SMARTStatus != nil,
-		SMARTPassed:    report.SMARTStatus != nil && report.SMARTStatus.Passed,
-		TemperatureC:   report.Temperature.Current,
-		PowerOnHours:   report.PowerOnTime.Hours,
-		Reallocated:    reallocated,
-		Pending:        pending,
-		Uncorrectable:  uncorrectable,
-		FARMAvailable:  farmAvailable,
-		FARM:           farm,
-		CollectedUTC:   time.Now().UTC(),
+		ID:              id,
+		Path:            device,
+		Model:           report.ModelName,
+		Serial:          report.SerialNumber,
+		Firmware:        report.Firmware,
+		Protocol:        report.Device.Protocol,
+		Capacity:        report.UserCapacity.Bytes,
+		SMARTAvailable:  report.SMARTStatus != nil,
+		SMARTPassed:     report.SMARTStatus != nil && report.SMARTStatus.Passed,
+		TemperatureC:    report.Temperature.Current,
+		PowerOnHours:    report.PowerOnTime.Hours,
+		Reallocated:     reallocated,
+		Pending:         pending,
+		Uncorrectable:   uncorrectable,
+		SMARTAttributes: attributes,
+		FARMAvailable:   farmAvailable,
+		FARM:            farm,
+		CollectedUTC:    time.Now().UTC(),
 	})
 }
 

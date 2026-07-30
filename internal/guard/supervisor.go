@@ -10,24 +10,36 @@ import (
 	"time"
 )
 
+type SMARTAttribute struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Current    int64  `json:"current,omitempty"`
+	Worst      int64  `json:"worst,omitempty"`
+	Threshold  int64  `json:"threshold,omitempty"`
+	RawValue   int64  `json:"rawValue"`
+	RawString  string `json:"rawString,omitempty"`
+	WhenFailed string `json:"whenFailed,omitempty"`
+}
+
 type ProbeData struct {
-	ID             string    `json:"id"`
-	Path           string    `json:"path"`
-	Model          string    `json:"model,omitempty"`
-	Serial         string    `json:"serial,omitempty"`
-	Firmware       string    `json:"firmware,omitempty"`
-	Protocol       string    `json:"protocol,omitempty"`
-	Capacity       int64     `json:"capacityBytes,omitempty"`
-	SMARTAvailable bool      `json:"smartAvailable"`
-	SMARTPassed    bool      `json:"smartPassed"`
-	TemperatureC   int64     `json:"temperatureC,omitempty"`
-	PowerOnHours   int64     `json:"powerOnHours,omitempty"`
-	Reallocated    int64     `json:"reallocatedSectors,omitempty"`
-	Pending        int64     `json:"pendingSectors,omitempty"`
-	Uncorrectable  int64     `json:"uncorrectableSectors,omitempty"`
-	FARMAvailable  bool      `json:"farmAvailable"`
-	FARM           any       `json:"farm,omitempty"`
-	CollectedUTC   time.Time `json:"collectedAt"`
+	ID              string           `json:"id"`
+	Path            string           `json:"path"`
+	Model           string           `json:"model,omitempty"`
+	Serial          string           `json:"serial,omitempty"`
+	Firmware        string           `json:"firmware,omitempty"`
+	Protocol        string           `json:"protocol,omitempty"`
+	Capacity        int64            `json:"capacityBytes,omitempty"`
+	SMARTAvailable  bool             `json:"smartAvailable"`
+	SMARTPassed     bool             `json:"smartPassed"`
+	TemperatureC    int64            `json:"temperatureC,omitempty"`
+	PowerOnHours    int64            `json:"powerOnHours,omitempty"`
+	Reallocated     int64            `json:"reallocatedSectors,omitempty"`
+	Pending         int64            `json:"pendingSectors,omitempty"`
+	Uncorrectable   int64            `json:"uncorrectableSectors,omitempty"`
+	SMARTAttributes []SMARTAttribute `json:"smartAttributes,omitempty"`
+	FARMAvailable   bool             `json:"farmAvailable"`
+	FARM            any              `json:"farm,omitempty"`
+	CollectedUTC    time.Time        `json:"collectedAt"`
 }
 
 type DeviceState struct {

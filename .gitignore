@@ -4,3 +4,4 @@
 *.deb
 *.test
 
+.DS_Store

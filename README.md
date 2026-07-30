@@ -3,11 +3,20 @@
 Drivarr is a single-host Linux drive-diagnostics daemon with an authenticated
 Material Design 3 web interface.
 
+## Standalone UI demo
+
+The complete interactive demo is in [`demo/`](./demo). Open
+`demo/index.html` directly in a browser; it has no build step, backend, network
+requests, or hardware access.
+
 ## Features
 
 - SATA, SAS, NVMe, and USB-backed Linux block-device discovery
 - SMART telemetry and short, extended, and conveyance self-tests
 - Seagate FARM collection when the drive and transport expose it
+- Full-screen per-drive workspace with live progress, sector mapping, complete
+  SMART attributes, flattened FARM metrics, and retained test history
+- Heuristic SMART-history consistency checks using independent FARM counters
 - Sequential throughput and random-read IOPS benchmarks
 - Full non-destructive bad-block scans with exact failing offsets
 - Destructive chunked write/read CRC32C verification
@@ -80,4 +89,3 @@ sudo systemctl start drivarr
 
 Persistent data and reports remain in `/var/lib/drivarr` when the package is
 removed.
-
