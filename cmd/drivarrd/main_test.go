@@ -47,3 +47,22 @@ func TestStylesheetIsEmbeddedAndServed(t *testing.T) {
 		t.Fatal("served stylesheet does not contain the Material theme")
 	}
 }
+
+func TestFarmStringReadsDriveInformation(t *testing.T) {
+	farm := map[string]any{
+		"page_1_drive_information": map[string]any{
+			"device_interface":     " SATA ",
+			"drive_recording_type": "CMR",
+		},
+	}
+
+	if got := farmString(farm, "page_1_drive_information", "device_interface"); got != "SATA" {
+		t.Fatalf("device interface = %q, want SATA", got)
+	}
+	if got := farmString(farm, "page_1_drive_information", "drive_recording_type"); got != "CMR" {
+		t.Fatalf("recording type = %q, want CMR", got)
+	}
+	if got := farmString(farm, "page_1_drive_information", "missing"); got != "" {
+		t.Fatalf("missing FARM field = %q, want empty", got)
+	}
+}

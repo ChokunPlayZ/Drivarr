@@ -41,6 +41,8 @@ type ProbeData struct {
 	SMARTAttributes []SMARTAttribute `json:"smartAttributes,omitempty"`
 	FARMAvailable   bool             `json:"farmAvailable"`
 	FARM            any              `json:"farm,omitempty"`
+	DeviceInterface string           `json:"deviceInterface,omitempty"`
+	RecordingType   string           `json:"recordingType,omitempty"`
 	CollectedUTC    time.Time        `json:"collectedAt"`
 }
 

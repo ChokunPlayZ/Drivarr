@@ -427,12 +427,15 @@ func workerProbe(device string, output io.Writer) error {
 	}
 	var farm any
 	farmAvailable := false
+	var deviceInterface, recordingType string
 	farmCommand := exec.Command(smartctl, "--json=o", "--log", "farm", device)
 	if farmRaw, _ := farmCommand.Output(); len(farmRaw) > 0 {
 		var farmEnvelope map[string]any
 		if json.Unmarshal(farmRaw, &farmEnvelope) == nil {
 			if value, exists := farmEnvelope["seagate_farm_log"]; exists {
 				farm, farmAvailable = value, true
+				deviceInterface = farmString(value, "page_1_drive_information", "device_interface")
+				recordingType = farmString(value, "page_1_drive_information", "drive_recording_type")
 			}
 		}
 	}
@@ -454,8 +457,29 @@ func workerProbe(device string, output io.Writer) error {
 		SMARTAttributes: attributes,
 		FARMAvailable:   farmAvailable,
 		FARM:            farm,
+		DeviceInterface: deviceInterface,
+		RecordingType:   recordingType,
 		CollectedUTC:    time.Now().UTC(),
 	})
+}
+
+func farmString(value any, path ...string) string {
+	current := value
+	for _, key := range path {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current, ok = object[key]
+		if !ok {
+			return ""
+		}
+	}
+	result, ok := current.(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(result)
 }
 
 func workerFIO(args []string, output io.Writer) error {
