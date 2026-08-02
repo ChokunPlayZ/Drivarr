@@ -1,10 +1,12 @@
 package guard
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -306,5 +308,11 @@ func (s *Supervisor) Snapshot() []DeviceState {
 		copy := *state
 		result = append(result, copy)
 	}
+	slices.SortFunc(result, func(a, b DeviceState) int {
+		if order := cmp.Compare(a.Path, b.Path); order != 0 {
+			return order
+		}
+		return cmp.Compare(a.ID, b.ID)
+	})
 	return result
 }

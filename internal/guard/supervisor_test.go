@@ -38,3 +38,18 @@ func TestTimedOutDriveIsQuarantinedAndNotAutomaticallyRetried(t *testing.T) {
 		t.Fatal("automatic probe retried a quarantined drive")
 	}
 }
+
+func TestSnapshotSortsDevicesByPath(t *testing.T) {
+	supervisor := NewSupervisor(&hangingRunner{}, "drivarrd", time.Second, 1,
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	supervisor.devices["third"] = &DeviceState{ID: "third", Path: "/dev/sdc"}
+	supervisor.devices["first"] = &DeviceState{ID: "first", Path: "/dev/sda"}
+	supervisor.devices["second"] = &DeviceState{ID: "second", Path: "/dev/sdb"}
+
+	devices := supervisor.Snapshot()
+	for index, path := range []string{"/dev/sda", "/dev/sdb", "/dev/sdc"} {
+		if devices[index].Path != path {
+			t.Fatalf("device %d has path %q, want %q", index, devices[index].Path, path)
+		}
+	}
+}
