@@ -23,6 +23,16 @@ type SMARTAttribute struct {
 	WhenFailed string `json:"whenFailed,omitempty"`
 }
 
+// SMARTSelfTest describes a firmware self-test that was already running when
+// the device was probed. It is intentionally independent of Drivarr jobs: a
+// test may have been started by smartctl, smartd, another host, or an earlier
+// daemon instance.
+type SMARTSelfTest struct {
+	Kind            string `json:"kind"`
+	Status          string `json:"status"`
+	ProgressPercent *int   `json:"progressPercent,omitempty"`
+}
+
 type ProbeData struct {
 	ID              string           `json:"id"`
 	Path            string           `json:"path"`
@@ -33,6 +43,7 @@ type ProbeData struct {
 	Capacity        int64            `json:"capacityBytes,omitempty"`
 	SMARTAvailable  bool             `json:"smartAvailable"`
 	SMARTPassed     bool             `json:"smartPassed"`
+	SMARTSelfTest   *SMARTSelfTest   `json:"smartSelfTest,omitempty"`
 	TemperatureC    int64            `json:"temperatureC,omitempty"`
 	PowerOnHours    int64            `json:"powerOnHours,omitempty"`
 	Reallocated     int64            `json:"reallocatedSectors,omitempty"`

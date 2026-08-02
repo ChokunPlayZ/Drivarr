@@ -375,6 +375,10 @@ func workerProbe(device string, output io.Writer) error {
 	if err := json.Unmarshal(raw, &report); err != nil {
 		return fmt.Errorf("invalid smartctl JSON: %w", err)
 	}
+	var rawReport map[string]any
+	if err := json.Unmarshal(raw, &rawReport); err != nil {
+		return fmt.Errorf("invalid smartctl JSON object: %w", err)
+	}
 	fingerprint := fmt.Sprintf("%s|%s|%d|%d:%d:%d", report.ModelName, report.SerialNumber,
 		report.UserCapacity.Bytes, report.WWN.NAA, report.WWN.OUI, report.WWN.ID)
 	fingerprintHash := sha256.Sum256([]byte(fingerprint))
@@ -421,6 +425,7 @@ func workerProbe(device string, output io.Writer) error {
 		Capacity:        report.UserCapacity.Bytes,
 		SMARTAvailable:  report.SMARTStatus != nil,
 		SMARTPassed:     report.SMARTStatus != nil && report.SMARTStatus.Passed,
+		SMARTSelfTest:   detectSMARTSelfTest(rawReport),
 		TemperatureC:    report.Temperature.Current,
 		PowerOnHours:    report.PowerOnTime.Hours,
 		Reallocated:     reallocated,
@@ -433,6 +438,147 @@ func workerProbe(device string, output io.Writer) error {
 		RecordingType:   recordingType,
 		CollectedUTC:    time.Now().UTC(),
 	})
+}
+
+func detectSMARTSelfTest(report map[string]any) *guard.SMARTSelfTest {
+	// ATA exposes the live execution byte separately from its test log. A high
+	// nibble of 0xf means a test is running; the low nibble is the percentage
+	// remaining in ten-percent increments.
+	if status := objectAt(report, "ata_smart_data", "self_test", "status"); status != nil {
+		value, hasValue := numberAt(status, "value")
+		remaining, hasRemaining := numberAt(status, "remaining_percent")
+		if (hasValue && int(value)>>4 == 0xf) || hasRemaining {
+			progress := clampPercent(100 - int(remaining))
+			kind := activeATASelfTestKind(report)
+			if kind == "" {
+				kind = "SMART self-test"
+			}
+			return &guard.SMARTSelfTest{
+				Kind: kind, Status: stringAt(status, "string"), ProgressPercent: &progress,
+			}
+		}
+	}
+
+	// NVMe reports both the operation and completed percentage in its device
+	// self-test log. Operation zero explicitly means that no test is active.
+	if log := objectAt(report, "nvme_self_test_log"); log != nil {
+		operation := objectAt(log, "current_self_test_operation")
+		value, ok := numberAt(operation, "value")
+		if ok && int(value) != 0 {
+			kind := stringAt(operation, "string")
+			if kind == "" {
+				kind = nvmeSelfTestKind(int(value))
+			}
+			result := &guard.SMARTSelfTest{Kind: kind, Status: kind}
+			if completed, exists := numberAt(log, "current_self_test_completion_percent"); exists {
+				progress := clampPercent(int(completed))
+				result.ProgressPercent = &progress
+			}
+			return result
+		}
+	}
+
+	// SCSI/SAS records the currently running test as a live entry in the
+	// self-test log. smartctl currently does not put REQUEST SENSE progress in
+	// JSON, so progress remains unknown while the type is still displayed.
+	for key, value := range report {
+		if !strings.HasPrefix(key, "scsi_self_test_") {
+			continue
+		}
+		entry, ok := value.(map[string]any)
+		if !ok || !boolAt(entry, "self_test_in_progress") {
+			continue
+		}
+		kind := stringAt(objectAt(entry, "code"), "string")
+		if kind == "" {
+			kind = "SCSI self-test"
+		}
+		return &guard.SMARTSelfTest{Kind: kind, Status: "Self-test in progress"}
+	}
+	return nil
+}
+
+func activeATASelfTestKind(report map[string]any) string {
+	root := objectAt(report, "ata_smart_self_test_log")
+	var visit func(any) string
+	visit = func(value any) string {
+		switch item := value.(type) {
+		case map[string]any:
+			if status := objectAt(item, "status"); status != nil {
+				if raw, ok := numberAt(status, "value"); ok && int(raw)>>4 == 0xf {
+					if kind := stringAt(objectAt(item, "type"), "string"); kind != "" {
+						return kind
+					}
+				}
+			}
+			for _, child := range item {
+				if kind := visit(child); kind != "" {
+					return kind
+				}
+			}
+		case []any:
+			for _, child := range item {
+				if kind := visit(child); kind != "" {
+					return kind
+				}
+			}
+		}
+		return ""
+	}
+	return visit(root)
+}
+
+func objectAt(value map[string]any, path ...string) map[string]any {
+	current := value
+	for _, key := range path {
+		next, ok := current[key].(map[string]any)
+		if !ok {
+			return nil
+		}
+		current = next
+	}
+	return current
+}
+
+func numberAt(value map[string]any, key string) (float64, bool) {
+	if value == nil {
+		return 0, false
+	}
+	number, ok := value[key].(float64)
+	return number, ok
+}
+
+func stringAt(value map[string]any, key string) string {
+	if value == nil {
+		return ""
+	}
+	result, _ := value[key].(string)
+	return result
+}
+
+func boolAt(value map[string]any, key string) bool {
+	if value == nil {
+		return false
+	}
+	result, _ := value[key].(bool)
+	return result
+}
+
+func clampPercent(value int) int {
+	return max(0, min(100, value))
+}
+
+func nvmeSelfTestKind(operation int) string {
+	switch operation {
+	case 1:
+		return "Short self-test"
+	case 2:
+		return "Extended self-test"
+	case 14:
+		return "Vendor-specific self-test"
+	default:
+		return "NVMe self-test"
+	}
 }
 
 func farmString(value any, path ...string) string {

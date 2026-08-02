@@ -12,7 +12,9 @@ requests, or hardware access.
 ## Features
 
 - SATA, SAS, NVMe, and USB-backed Linux block-device discovery
-- SMART telemetry and short, extended, and conveyance self-tests
+- SMART telemetry and short, extended, and conveyance self-tests, with
+  automatic detection and progress display for tests already running in drive
+  firmware
 - Seagate FARM collection when the drive and transport expose it
 - Full-screen per-drive workspace with live progress, sector mapping, complete
   SMART attributes, flattened FARM metrics, and retained test history
