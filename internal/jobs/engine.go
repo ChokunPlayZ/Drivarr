@@ -40,6 +40,8 @@ type Engine struct {
 	logger      *slog.Logger
 	queue       chan string
 	destructive chan struct{}
+	deviceMu    sync.Mutex
+	deviceLocks map[string]*sync.Mutex
 	mu          sync.Mutex
 	running     map[string]context.CancelFunc
 	ctx         context.Context
@@ -51,7 +53,7 @@ func NewEngine(store *core.Store, runner guard.Runner, executable string, device
 		store: store, runner: runner, executable: executable, devices: devices,
 		logger: logger, queue: make(chan string, 256),
 		destructive: make(chan struct{}, max(1, settings.MaxDestructiveJobs)),
-		running:     make(map[string]context.CancelFunc),
+		deviceLocks: make(map[string]*sync.Mutex), running: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -122,11 +124,6 @@ func (e *Engine) Create(user core.User, device guard.DeviceState, kind core.Test
 			return core.Job{}, errors.New("serial-number confirmation does not match")
 		}
 	}
-	for _, existing := range e.store.Jobs() {
-		if existing.DeviceID == device.ID && isActive(existing.Status) {
-			return core.Job{}, errors.New("another test is active for this drive")
-		}
-	}
 	policy, ok := e.store.Policy(policyID)
 	if !ok {
 		policy, _ = e.store.Policy("conservative")
@@ -151,6 +148,14 @@ func (e *Engine) Create(user core.User, device guard.DeviceState, kind core.Test
 
 func (e *Engine) execute(parent context.Context, id string) {
 	job, ok := e.store.Job(id)
+	if !ok || (job.Status != core.JobQueued && job.Status != core.JobInterrupted) {
+		return
+	}
+	unlockDevice := e.lockDevice(job.DeviceID)
+	defer unlockDevice()
+	// A worker may have waited behind another test for this drive. Reload the
+	// job so cancellation or another state change made while queued is honored.
+	job, ok = e.store.Job(id)
 	if !ok || (job.Status != core.JobQueued && job.Status != core.JobInterrupted) {
 		return
 	}
@@ -212,6 +217,18 @@ func (e *Engine) execute(parent context.Context, id string) {
 	case core.TestSMARTShort, core.TestSMARTLong, core.TestSMARTConvey:
 		e.runSMART(ctx, &job)
 	}
+}
+
+func (e *Engine) lockDevice(id string) func() {
+	e.deviceMu.Lock()
+	lock := e.deviceLocks[id]
+	if lock == nil {
+		lock = &sync.Mutex{}
+		e.deviceLocks[id] = lock
+	}
+	e.deviceMu.Unlock()
+	lock.Lock()
+	return lock.Unlock
 }
 
 func (e *Engine) runChunked(ctx context.Context, job *core.Job) {

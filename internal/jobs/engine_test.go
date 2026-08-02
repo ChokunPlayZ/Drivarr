@@ -4,7 +4,10 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"drivarr/internal/core"
 	"drivarr/internal/guard"
@@ -16,6 +19,26 @@ func (fakeRunner) Run(context.Context, string, ...string) guard.RunResult {
 	return guard.RunResult{Output: []byte(`{"safe":true}`)}
 }
 func (fakeRunner) BlockedProcesses() int64 { return 0 }
+
+type trackingRunner struct {
+	active int64
+	max    int64
+}
+
+func (r *trackingRunner) Run(context.Context, string, ...string) guard.RunResult {
+	active := atomic.AddInt64(&r.active, 1)
+	for {
+		maximum := atomic.LoadInt64(&r.max)
+		if active <= maximum || atomic.CompareAndSwapInt64(&r.max, maximum, active) {
+			break
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	atomic.AddInt64(&r.active, -1)
+	return guard.RunResult{Output: []byte(`{"readBps":1,"readIops":1}`)}
+}
+
+func (r *trackingRunner) BlockedProcesses() int64 { return 0 }
 
 type fakeDevices struct{ value guard.DeviceState }
 
@@ -49,5 +72,66 @@ func TestCreateDestructiveJobRequiresGatesAndSnapshotsProfile(t *testing.T) {
 	}
 	if !job.Destructive || job.ProfileID != "destructive-verify" || job.PolicySnapshot.ID != "conservative" {
 		t.Fatalf("job did not preserve its safety/profile/policy snapshot: %+v", job)
+	}
+}
+
+func TestCreateQueuesAnotherTestForActiveDrive(t *testing.T) {
+	store, err := core.OpenStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	device := guard.DeviceState{
+		ID: "dev_test", Path: "/dev/test", Status: "ready",
+		Probe: &guard.ProbeData{ID: "fingerprint", Serial: "SERIAL", Capacity: 1 << 30},
+	}
+	engine := NewEngine(store, fakeRunner{}, "drivarrd", fakeDevices{value: device},
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	user := core.User{ID: "operator", Role: core.RoleOperator}
+
+	if _, err := engine.Create(user, device, core.TestSMARTShort, "", "conservative", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := engine.Create(user, device, core.TestSMARTLong, "", "conservative", ""); err != nil {
+		t.Fatalf("queueing a second test: %v", err)
+	}
+	if got := len(store.Jobs()); got != 2 {
+		t.Fatalf("queued %d tests, want 2", got)
+	}
+}
+
+func TestQueuedTestsForSameDriveRunSerially(t *testing.T) {
+	store, err := core.OpenStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	device := guard.DeviceState{
+		ID: "dev_test", Path: "/dev/test", Status: "ready",
+		Probe: &guard.ProbeData{ID: "fingerprint", Serial: "SERIAL", Capacity: 1 << 30},
+	}
+	runner := &trackingRunner{}
+	engine := NewEngine(store, runner, "drivarrd", fakeDevices{value: device},
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	user := core.User{ID: "operator", Role: core.RoleOperator}
+	first, err := engine.Create(user, device, core.TestSpeed, "", "conservative", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := engine.Create(user, device, core.TestSpeed, "", "conservative", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	for _, id := range []string{first.ID, second.ID} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			engine.execute(context.Background(), id)
+		}()
+	}
+	wg.Wait()
+
+	if got := atomic.LoadInt64(&runner.max); got != 1 {
+		t.Fatalf("%d tests ran on the same drive at once, want 1", got)
 	}
 }
