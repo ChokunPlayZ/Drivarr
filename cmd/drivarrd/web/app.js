@@ -1,6 +1,7 @@
 const $=(value)=>document.querySelector(value), $$=(value)=>[...document.querySelectorAll(value)];
 const state={user:null,devices:[],jobs:[],reports:[],settings:null,policies:[],profiles:[]};
 let selectedDeviceId=null,selectedWorkspaceJob=null;
+let liveRefreshInFlight=false;
 const escapeHTML=(value="")=>String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmtBytes=(bytes=0)=>{if(!bytes)return"—";const u=["B","KB","MB","GB","TB"];let v=bytes,i=0;while(v>=1000&&i<u.length-1){v/=1000;i++}return`${v.toFixed(i>2?2:0)} ${u[i]}`};
 const fmtSpeed=(value)=>value?`${fmtBytes(value)}/s`:"—";
@@ -80,19 +81,37 @@ function renderDeviceWorkspace(){
 function reportRows(){
  if(!state.reports.length)return`<div class="empty">Generate a PDF from a completed test.</div>`;
  return`<table><thead><tr><th>Report</th><th>Test</th><th>Verdict</th><th>Created</th><th>Integrity</th><th>Download</th></tr></thead><tbody>${state.reports.map(r=>`<tr><td><strong>${escapeHTML(r.id)}</strong></td><td>${escapeHTML(r.jobId)}</td><td><span class="status status-${r.verdict==="pass"?"completed":escapeHTML(r.verdict)}">${escapeHTML(r.verdict)}</span></td><td>${fmtDate(r.createdAt)}</td><td><button data-verify="${r.id}">Verify</button></td><td><a href="/api/v1/reports/${encodeURIComponent(r.id)}/download">PDF</a> · <a href="/api/v1/reports/${encodeURIComponent(r.id)}/checksum">SHA-256</a></td></tr>`).join("")}</tbody></table>`}
+function syncSelect(select,html){
+ const selected=select.value;
+ if(select.innerHTML!==html)select.innerHTML=html;
+ if([...select.options].some(option=>option.value===selected))select.value=selected
+}
+function renderLiveData(){
+ $("#devices").innerHTML=state.devices.length?state.devices.map(deviceCard).join(""):`<div class="empty">No physical drives discovered.</div>`;
+ $("#jobs").innerHTML=jobRows(state.jobs);$("#recent-jobs").innerHTML=jobRows(state.jobs.slice(0,5));$("#reports").innerHTML=reportRows();
+ $("#summary").innerHTML=[["Drives",state.devices.length],["Ready",state.devices.filter(d=>d.status==="ready").length],["Quarantined",state.devices.filter(d=>d.status==="quarantined").length],["Active tests",state.jobs.filter(j=>["queued","validating","running"].includes(j.status)).length]].map(([l,v])=>`<div class="summary-card"><span>${l}</span><strong>${v}</strong></div>`).join("");
+ if(selectedDeviceId&&$("#drive-workspace").open)renderDeviceWorkspace()
+}
 async function refreshAll(){
  try{
   const [devices,jobs,reports,settings,policies,profiles]=await Promise.all([api("/api/v1/devices"),api("/api/v1/jobs"),api("/api/v1/reports"),api("/api/v1/settings"),api("/api/v1/policies"),api("/api/v1/profiles")]);
   Object.assign(state,{devices:devices.devices,jobs:jobs.jobs,reports:reports.reports,settings,policies:policies.policies,profiles:profiles.profiles});
-  $("#test-form").elements.profileId.innerHTML=state.profiles.filter(p=>p.enabled).map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)}${p.builtIn?"":" · advanced"}</option>`).join("");
-  $("#test-form").elements.policyId.innerHTML=state.policies.map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)} · v${p.version}</option>`).join("");
-  $("#devices").innerHTML=state.devices.length?state.devices.map(deviceCard).join(""):`<div class="empty">No physical drives discovered.</div>`;
-  $("#jobs").innerHTML=jobRows(state.jobs);$("#recent-jobs").innerHTML=jobRows(state.jobs.slice(0,5));$("#reports").innerHTML=reportRows();
-	  $("#summary").innerHTML=[["Drives",state.devices.length],["Ready",state.devices.filter(d=>d.status==="ready").length],["Quarantined",state.devices.filter(d=>d.status==="quarantined").length],["Active tests",state.jobs.filter(j=>["queued","validating","running"].includes(j.status)).length]].map(([l,v])=>`<div class="summary-card"><span>${l}</span><strong>${v}</strong></div>`).join("");
+  syncSelect($("#test-form").elements.profileId,state.profiles.filter(p=>p.enabled).map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)}${p.builtIn?"":" · advanced"}</option>`).join(""));
+  syncSelect($("#test-form").elements.policyId,state.policies.map(p=>`<option value="${escapeHTML(p.id)}">${escapeHTML(p.name)} · v${p.version}</option>`).join(""));
+	  renderLiveData();
 	  $("#daemon-state").textContent="Daemon responsive";$("#daemon-state").className="status status-ready";$("#updated").textContent=`Updated ${new Date().toLocaleTimeString()}`;
-	  if(selectedDeviceId&&$("#drive-workspace").open)renderDeviceWorkspace();
 	  if(state.user.role==="admin")await refreshAdmin();
  }catch(error){$("#daemon-state").textContent="Connection lost";$("#daemon-state").className="status status-quarantined";notify(error.message,true)}
+}
+async function refreshLive(){
+ if(liveRefreshInFlight)return;liveRefreshInFlight=true;
+ try{
+  const [devices,jobs,reports]=await Promise.all([api("/api/v1/devices"),api("/api/v1/jobs"),api("/api/v1/reports")]);
+  const changed=JSON.stringify([state.devices,state.jobs,state.reports])!==JSON.stringify([devices.devices,jobs.jobs,reports.reports]);
+  Object.assign(state,{devices:devices.devices,jobs:jobs.jobs,reports:reports.reports});
+  if(changed)renderLiveData();
+  $("#daemon-state").textContent="Daemon responsive";$("#daemon-state").className="status status-ready";$("#updated").textContent=`Updated ${new Date().toLocaleTimeString()}`
+ }catch(error){$("#daemon-state").textContent="Connection lost";$("#daemon-state").className="status status-quarantined";notify(error.message,true)}finally{liveRefreshInFlight=false}
 }
 async function refreshAdmin(){
  const [users,audit]=await Promise.all([api("/api/v1/users"),api("/api/v1/audit")]);
@@ -125,4 +144,4 @@ $("#password-form").addEventListener("submit",async e=>{e.preventDefault();const
 $("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const f=new FormData(e.currentTarget),body={name:f.get("name"),kind:f.get("kind"),blockSizeKiB:Number(f.get("blockSizeKiB")),queueDepth:Number(f.get("queueDepth")),durationSeconds:Number(f.get("durationSeconds")),rateMiB:Number(f.get("rateMiB"))};try{await api("/api/v1/profiles",{method:"POST",body:JSON.stringify(body)});e.currentTarget.reset();notify("Advanced profile created");await refreshAll()}catch(error){notify(error.message,true)}});
 $("#policy-form").addEventListener("submit",async e=>{e.preventDefault();const f=new FormData(e.currentTarget),body={name:f.get("name"),failOnSmart:f.get("failOnSmart")==="on",failOnIoError:f.get("failOnIoError")==="on",warnPendingAbove:Number(f.get("warnPendingAbove")),warnReallocatedAbove:Number(f.get("warnReallocatedAbove")),warnUncorrectableAbove:Number(f.get("warnUncorrectableAbove"))};try{await api("/api/v1/policies",{method:"POST",body:JSON.stringify(body)});e.currentTarget.reset();notify("Grading policy created");await refreshAll()}catch(error){notify(error.message,true)}});
 (async()=>{try{const user=await api("/api/v1/auth/session");showApp(user);await refreshAll()}catch{showLogin()}})();
-setInterval(()=>{if(state.user)refreshAll()},3000);
+setInterval(()=>{if(state.user)refreshLive()},3000);

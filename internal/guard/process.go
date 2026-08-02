@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -44,10 +45,12 @@ func (r *ProcessRunner) BlockedProcesses() int64 {
 
 func (r *ProcessRunner) Run(ctx context.Context, executable string, args ...string) RunResult {
 	started := time.Now()
-	var output limitedBuffer
+	var output, stderr limitedBuffer
 	command := exec.Command(executable, args...)
 	command.Stdout = &output
-	command.Stderr = &output
+	// Worker operations return machine-readable JSON on stdout. Keep stderr
+	// separate so diagnostics emitted by fio/smartctl cannot corrupt that JSON.
+	command.Stderr = &stderr
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := command.Start(); err != nil {
 		return RunResult{Err: err, Elapsed: time.Since(started)}
@@ -59,6 +62,11 @@ func (r *ProcessRunner) Run(ctx context.Context, executable string, args ...stri
 
 	select {
 	case err := <-done:
+		if err != nil {
+			if detail := strings.TrimSpace(string(stderr.Bytes())); detail != "" {
+				err = fmt.Errorf("%w: %s", err, detail)
+			}
+		}
 		return RunResult{Output: output.Bytes(), Err: err, ProcessID: pid, Elapsed: time.Since(started)}
 	case <-ctx.Done():
 		// Negative PID targets every subprocess in the disposable worker's group.
