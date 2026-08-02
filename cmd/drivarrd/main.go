@@ -23,14 +23,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"drivarr/internal/core"
+	"drivarr/internal/drives"
 	"drivarr/internal/guard"
 	"drivarr/internal/jobs"
 )
@@ -51,12 +50,6 @@ var appJS string
 var openapiYAML string
 
 var version = "dev"
-
-type workerDevice struct {
-	ID   string `json:"id"`
-	Path string `json:"path"`
-	Name string `json:"name"`
-}
 
 type smartctlEnvelope struct {
 	Device struct {
@@ -358,31 +351,10 @@ func runWorker(args []string) error {
 }
 
 func workerDiscover(output io.Writer) error {
-	if runtime.GOOS != "linux" {
-		return json.NewEncoder(output).Encode([]workerDevice{})
-	}
-	entries, err := os.ReadDir("/sys/class/block")
+	devices, err := drives.Discover()
 	if err != nil {
 		return err
 	}
-	devices := make([]workerDevice, 0, len(entries))
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") ||
-			strings.HasPrefix(name, "dm-") || strings.HasPrefix(name, "md") {
-			continue
-		}
-		partitionMarker := filepath.Join("/sys/class/block", name, "partition")
-		if _, err := os.Stat(partitionMarker); err == nil {
-			continue
-		}
-		devices = append(devices, workerDevice{
-			ID:   name,
-			Path: filepath.Join("/dev", name),
-			Name: name,
-		})
-	}
-	slices.SortFunc(devices, func(a, b workerDevice) int { return strings.Compare(a.Name, b.Name) })
 	return json.NewEncoder(output).Encode(devices)
 }
 

@@ -63,6 +63,35 @@ make build
 DRIVARR_BOOTSTRAP_PASSWORD='replace-with-a-long-password' make run
 ```
 
+`make build` creates the daemon at `build/drivarrd` and the local administration
+CLI at `build/drivarrctl`.
+
+## Command-line administration
+
+List physical drives without opening or probing them:
+
+```sh
+sudo drivarrctl drives
+sudo drivarrctl drives --json
+```
+
+Stop the service before changing accounts so the daemon and CLI do not write the
+state file concurrently. Passwords must contain at least 12 characters. Passing
+them through standard input or a root-readable file avoids exposing them in the
+process list:
+
+```sh
+sudo systemctl stop drivarr
+printf '%s\n' 'new-user-long-password' | sudo drivarrctl users create \
+  --username operator1 --role operator --password-stdin
+sudo drivarrctl users reset-password --username admin \
+  --password-file /root/drivarr-admin-password
+sudo systemctl start drivarr
+```
+
+Valid roles are `admin`, `operator`, and `viewer`. User commands operate on
+`/var/lib/drivarr` by default; use `--data-dir` for a development installation.
+
 Open <http://127.0.0.1:8787>. Development HTTP binds to localhost. A listener on
 another interface automatically receives a locally generated HTTPS certificate
 unless explicit `--tls-cert` and `--tls-key` paths are provided.
@@ -79,7 +108,9 @@ sudo apt install ./build/drivarr_0.1.0_*.deb
 ```
 
 Read the initial password with `journalctl -u drivarr`, then sign in as `admin`
-and change it. Local recovery is available without the web service:
+and change it. Local recovery is available without the web service. The legacy
+daemon command remains supported, though `drivarrctl users reset-password` is
+preferred:
 
 ```sh
 sudo systemctl stop drivarr
