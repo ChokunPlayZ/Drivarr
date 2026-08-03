@@ -17,7 +17,7 @@ paths:
     post: {summary: Start isolated drive discovery, responses: {'202': {description: Started}}}
   /jobs:
     get: {summary: Test history and progress, responses: {'200': {description: Jobs}}}
-    post: {summary: Queue a test profile, responses: {'201': {description: Job created}}}
+    post: {summary: Queue an individual test profile or ordered test preset, responses: {'201': {description: Job or preset suite created}}}
   /jobs/{id}:
     delete:
       summary: Delete a failed, cancelled, or interrupted test

@@ -31,3 +31,9 @@ func TestGeneratedReportsStartAFileDownload(t *testing.T) {
 		t.Fatal("frontend bundle does not contain the report download route")
 	}
 }
+
+func TestFrontendIncludesCompleteDrivePreset(t *testing.T) {
+	if !strings.Contains(appJS, "complete-drive-check") || !strings.Contains(appJS, "Complete drive check") {
+		t.Fatal("frontend bundle does not expose the complete drive test preset")
+	}
+}

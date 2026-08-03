@@ -483,8 +483,12 @@ func drawSMARTTable(c *pdfCanvas, probe *guard.ProbeData, y float64) {
 
 func makeStyledJobPDF(value Manifest, dataHash string) []byte {
 	pages := []*pdfCanvas{{}, {}}
+	evidenceTitle := "Test Evidence"
+	if value.Job.Kind == core.TestSurfaceRead || value.Job.Kind == core.TestDestructive {
+		evidenceTitle = "Test Evidence and Surface Map"
+	}
 	for index, page := range pages {
-		reportHeader(page, value.Organization, []string{"Drive Diagnostic Report", "Test Evidence and Surface Map"}[index], value.ReportID, dataHash, index+1, len(pages))
+		reportHeader(page, value.Organization, []string{"Drive Diagnostic Report", evidenceTitle}[index], value.ReportID, dataHash, index+1, len(pages))
 	}
 	drawDriveSummary(pages[0], value.Device, value.Job.Verdict)
 	drawHealthCounters(pages[0], value.Device.Probe, 555)
@@ -492,12 +496,16 @@ func makeStyledJobPDF(value Manifest, dataHash string) []byte {
 	pages[0].text(42, 117, 8, "ASSESSMENT NOTE", true, pdfMuted)
 	pages[0].wrappedText(42, 100, 8, "Generated "+formatPDFTime(value.GeneratedAt)+" by "+value.GeneratedBy+". Drive health is based on the captured SMART snapshot, media counters, test results, and the grading policy recorded in the immutable manifest.", 100, 11, false, pdfMuted)
 
-	drawJobEvidence(pages[1], value.Job)
-	drawIntegrityBlock(pages[1], value.ReportID, dataHash, 132)
+	hasSurfaceMap := drawJobEvidence(pages[1], value.Job)
+	integrityY := 260.0
+	if hasSurfaceMap {
+		integrityY = 132
+	}
+	drawIntegrityBlock(pages[1], value.ReportID, dataHash, integrityY)
 	return buildStyledPDF(pages)
 }
 
-func drawJobEvidence(c *pdfCanvas, job core.Job) {
+func drawJobEvidence(c *pdfCanvas, job core.Job) bool {
 	drawVerdict(c, job.Verdict)
 	c.text(42, 704, 12, "Test summary", true, pdfInk)
 	profile := job.ProfileName
@@ -506,9 +514,7 @@ func drawJobEvidence(c *pdfCanvas, job core.Job) {
 	}
 	c.text(42, 678, 16, truncatePDF(profile, 52), true, pdfInk)
 	c.text(42, 658, 9, truncatePDF("Job "+job.ID+"  /  "+string(job.Status)+"  /  "+formatPDFTime(job.CreatedAt), 88), false, pdfMuted)
-	metrics := []struct{ label, value string }{
-		{"Progress", fmt.Sprintf("%.1f%%", job.Progress*100)}, {"Bytes checked", formatPDFBytes(job.CompletedBytes)}, {"Read speed", formatPDFRate(job.ReadBPS)}, {"Random read", fmt.Sprintf("%.2f IOPS", job.ReadIOPS)},
-	}
+	metrics := jobPDFMetrics(job)
 	for index, metric := range metrics {
 		x := 42.0 + float64(index)*132
 		c.rect(x, 583, 120, 49, pdfPaper)
@@ -516,31 +522,99 @@ func drawJobEvidence(c *pdfCanvas, job core.Job) {
 		c.text(x+10, 594, 10, truncatePDF(metric.value, 18), true, pdfInk)
 	}
 	c.text(42, 548, 12, "Execution details", true, pdfInk)
-	details := []string{
-		"Policy: " + job.PolicyID + " v" + strconv.Itoa(job.PolicyVersion),
-		fmt.Sprintf("Block size: %d KiB  /  Queue depth: %d", job.BlockSizeKiB, job.QueueDepth),
-		"Last phase: " + fallbackPDF(job.CurrentPhase, "Completed"),
-	}
+	details := jobPDFDetails(job)
 	for index, detail := range details {
 		c.text(52, 522-float64(index)*20, 9, truncatePDF(detail, 94), index == 0, pdfInk)
 	}
-	c.text(42, 442, 12, "Recorded I/O errors", true, pdfInk)
-	if len(job.Errors) == 0 {
-		c.rect(42, 395, 528, 31, pdfPaper)
-		c.text(54, 407, 9, "No unreadable ranges were recorded.", true, pdfGreen)
-	} else {
-		rowY := 414.0
-		for index, item := range job.Errors {
-			if index >= 5 {
-				break
+	hasSurface := job.Kind == core.TestSurfaceRead || job.Kind == core.TestDestructive
+	if hasSurface {
+		c.text(42, 442, 12, "Recorded I/O errors", true, pdfInk)
+		if len(job.Errors) == 0 {
+			c.rect(42, 395, 528, 31, pdfPaper)
+			c.text(54, 407, 9, "No unreadable ranges were recorded.", true, pdfGreen)
+		} else {
+			rowY := 414.0
+			for index, item := range job.Errors {
+				if index >= 5 {
+					break
+				}
+				c.text(52, rowY, 8, fmt.Sprintf("Offset %d, length %d", item.Offset, item.Length), true, pdfInk)
+				c.text(270, rowY, 8, truncatePDF(item.Message, 48), false, pdfRed)
+				c.line(42, rowY-9, 570, rowY-9)
+				rowY -= 25
 			}
-			c.text(52, rowY, 8, fmt.Sprintf("Offset %d, length %d", item.Offset, item.Length), true, pdfInk)
-			c.text(270, rowY, 8, truncatePDF(item.Message, 48), false, pdfRed)
-			c.line(42, rowY-9, 570, rowY-9)
-			rowY -= 25
+		}
+		drawSurfaceMap(c, []core.Job{job}, 337)
+	}
+	return hasSurface
+}
+
+type pdfMetric struct{ label, value string }
+
+func jobPDFMetrics(job core.Job) []pdfMetric {
+	switch job.Kind {
+	case core.TestSpeed:
+		return []pdfMetric{
+			{"Sequential read", formatPDFRate(job.ReadBPS)},
+			{"Random read", fmt.Sprintf("%.2f IOPS", job.ReadIOPS)},
+			{"Test duration", fmt.Sprintf("%d seconds", job.DurationSeconds)},
+			{"Queue depth", strconv.Itoa(max(job.QueueDepth, 1))},
+		}
+	case core.TestSMARTShort, core.TestSMARTLong, core.TestSMARTConvey:
+		return []pdfMetric{
+			{"Progress", fmt.Sprintf("%.1f%%", job.Progress*100)},
+			{"Firmware test", smartTestPDFLabel(job.Kind)},
+			{"Started", formatPDFOptionalTime(job.StartedAt)},
+			{"Finished", formatPDFOptionalTime(job.FinishedAt)},
+		}
+	case core.TestDestructive:
+		return []pdfMetric{
+			{"Progress", fmt.Sprintf("%.1f%%", job.Progress*100)},
+			{"Bytes verified", formatPDFBytes(job.CompletedBytes)},
+			{"Read speed", formatPDFRate(job.ReadBPS)},
+			{"Write speed", formatPDFRate(job.WriteBPS)},
+		}
+	default:
+		return []pdfMetric{
+			{"Progress", fmt.Sprintf("%.1f%%", job.Progress*100)},
+			{"Bytes scanned", formatPDFBytes(job.CompletedBytes)},
+			{"Read speed", formatPDFRate(job.ReadBPS)},
+			{"I/O errors", strconv.Itoa(len(job.Errors))},
 		}
 	}
-	drawSurfaceMap(c, []core.Job{job}, 337)
+}
+
+func jobPDFDetails(job core.Job) []string {
+	details := []string{"Policy: " + job.PolicyID + " v" + strconv.Itoa(job.PolicyVersion)}
+	switch job.Kind {
+	case core.TestSpeed:
+		details = append(details,
+			fmt.Sprintf("Block size: %d KiB  /  Queue depth: %d", job.BlockSizeKiB, job.QueueDepth),
+			"Benchmark phases: sequential read and random read IOPS",
+		)
+	case core.TestSMARTShort, core.TestSMARTLong, core.TestSMARTConvey:
+		details = append(details,
+			"Command: drive firmware "+smartTestPDFLabel(job.Kind),
+			"Last phase: "+fallbackPDF(job.CurrentPhase, "Drive self-test completed"),
+		)
+	default:
+		details = append(details,
+			fmt.Sprintf("Block size: %d KiB  /  Queue depth: %d", job.BlockSizeKiB, job.QueueDepth),
+			"Last phase: "+fallbackPDF(job.CurrentPhase, "Completed"),
+		)
+	}
+	return details
+}
+
+func smartTestPDFLabel(kind core.TestKind) string {
+	switch kind {
+	case core.TestSMARTShort:
+		return "Short offline"
+	case core.TestSMARTConvey:
+		return "Conveyance offline"
+	default:
+		return "Extended offline"
+	}
 }
 
 func makeStyledDrivePDF(value DriveManifest, dataHash string) []byte {
@@ -582,7 +656,7 @@ func drawDriveJobs(c *pdfCanvas, jobs []core.Job, offset, total int, verdict cor
 	c.text(42, 704, 12, "Complete retained test history", true, pdfInk)
 	c.text(42, 684, 9, fmt.Sprintf("Tests %d-%d of %d", offset+1, offset+len(jobs), total), false, pdfMuted)
 	c.rect(42, 646, 528, 22, pdfPurple)
-	headings := []string{"Test", "Profile / kind", "Status", "Progress", "Performance"}
+	headings := []string{"Test", "Profile / kind", "Status", "Progress", "Key result"}
 	xs := []float64{49, 130, 350, 430, 490}
 	for index, heading := range headings {
 		c.text(xs[index], 654, 7, strings.ToUpper(heading), true, pdfWhite)
@@ -597,14 +671,26 @@ func drawDriveJobs(c *pdfCanvas, jobs []core.Job, offset, total int, verdict cor
 		c.text(130, rowY, 8, truncatePDF(profile, 31), true, pdfInk)
 		c.text(350, rowY, 8, truncatePDF(string(job.Status), 16), false, pdfInk)
 		c.text(430, rowY, 8, fmt.Sprintf("%.1f%%", job.Progress*100), false, pdfInk)
-		c.text(490, rowY, 8, truncatePDF(formatPDFRate(job.ReadBPS), 13), false, pdfInk)
+		c.text(490, rowY, 8, truncatePDF(jobPDFSummaryResult(job), 18), false, pdfInk)
 		c.line(42, rowY-13, 570, rowY-13)
 		rowY -= 39
 	}
 }
 
+func jobPDFSummaryResult(job core.Job) string {
+	switch job.Kind {
+	case core.TestSpeed:
+		return fmt.Sprintf("%s, %.0f IOPS", formatPDFCompactRate(job.ReadBPS), job.ReadIOPS)
+	case core.TestSMARTShort, core.TestSMARTLong, core.TestSMARTConvey:
+		return smartTestPDFLabel(job.Kind)
+	case core.TestDestructive:
+		return formatPDFCompactRate(job.ReadBPS) + " R/W verify"
+	default:
+		return fmt.Sprintf("%d err, %s", len(job.Errors), formatPDFCompactRate(job.ReadBPS))
+	}
+}
+
 func drawSurfaceMap(c *pdfCanvas, jobs []core.Job, y float64) {
-	c.text(42, y, 12, "Bad-block surface map", true, pdfInk)
 	var surface *core.Job
 	for index := range jobs {
 		if jobs[index].Kind == core.TestSurfaceRead || jobs[index].Kind == core.TestDestructive {
@@ -612,9 +698,9 @@ func drawSurfaceMap(c *pdfCanvas, jobs []core.Job, y float64) {
 		}
 	}
 	if surface == nil {
-		c.text(42, y-20, 8, "No surface scan is included in this report.", false, pdfMuted)
 		return
 	}
+	c.text(42, y, 12, "Bad-block surface map", true, pdfInk)
 	c.text(42, y-20, 8, fmt.Sprintf("%.1f%% scanned  /  %d unreadable ranges", surface.Progress*100, len(surface.Errors)), false, pdfMuted)
 	const cells = 144
 	total := max(surface.TotalBytes, 1)
@@ -713,6 +799,13 @@ func formatPDFRate(value int64) string {
 	return formatPDFBytes(value) + "/s"
 }
 
+func formatPDFCompactRate(value int64) string {
+	if value <= 0 {
+		return "No rate"
+	}
+	return strings.ReplaceAll(formatPDFBytes(value), " ", "") + "/s"
+}
+
 func formatPDFInt(value int64) string {
 	raw := strconv.FormatInt(value, 10)
 	for index := len(raw) - 3; index > 0; index -= 3 {
@@ -726,6 +819,13 @@ func formatPDFTime(value time.Time) string {
 		return "Unknown time"
 	}
 	return value.UTC().Format("2006-01-02 15:04 UTC")
+}
+
+func formatPDFOptionalTime(value *time.Time) string {
+	if value == nil {
+		return "Not recorded"
+	}
+	return value.UTC().Format("2006-01-02 15:04")
 }
 
 func fallbackPDF(value, fallback string) string {

@@ -256,6 +256,7 @@ func (a *api) createJob(w http.ResponseWriter, r *http.Request) {
 		DeviceID           string        `json:"deviceId"`
 		Kind               core.TestKind `json:"kind"`
 		ProfileID          string        `json:"profileId"`
+		PresetID           string        `json:"presetId"`
 		PolicyID           string        `json:"policyId"`
 		SerialConfirmation string        `json:"serialConfirmation"`
 		ReauthPassword     string        `json:"reauthPassword"`
@@ -266,6 +267,17 @@ func (a *api) createJob(w http.ResponseWriter, r *http.Request) {
 	device, ok := a.supervisor.Device(input.DeviceID)
 	if !ok {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "device not found"})
+		return
+	}
+	if input.PresetID != "" {
+		jobs, err := a.jobs.CreatePreset(requestUser(r), device, input.PresetID, input.PolicyID)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"presetId": input.PresetID, "suiteId": jobs[0].SuiteID, "jobs": jobs,
+		})
 		return
 	}
 	kind := input.Kind

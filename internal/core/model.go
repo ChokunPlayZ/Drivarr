@@ -105,6 +105,10 @@ type SectorError struct {
 
 type Job struct {
 	ID                string        `json:"id"`
+	SuiteID           string        `json:"suiteId,omitempty"`
+	PresetID          string        `json:"presetId,omitempty"`
+	SuiteStep         int           `json:"suiteStep,omitempty"`
+	SuiteTotal        int           `json:"suiteTotal,omitempty"`
 	DeviceID          string        `json:"deviceId"`
 	DevicePath        string        `json:"devicePath"`
 	DeviceFingerprint string        `json:"deviceFingerprint"`

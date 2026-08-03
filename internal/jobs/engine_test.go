@@ -99,6 +99,42 @@ func TestCreateQueuesAnotherTestForActiveDrive(t *testing.T) {
 	}
 }
 
+func TestCompleteDrivePresetQueuesOrderedSuite(t *testing.T) {
+	store, err := core.OpenStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	device := guard.DeviceState{
+		ID: "dev_test", Path: "/dev/test", Status: "ready",
+		Probe: &guard.ProbeData{ID: "fingerprint", Serial: "SERIAL", Capacity: 1 << 30},
+	}
+	engine := NewEngine(store, fakeRunner{}, "drivarrd", fakeDevices{value: device},
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	jobs, err := engine.CreatePreset(core.User{ID: "operator"}, device, PresetCompleteDriveCheck, "conservative")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 3 || len(engine.queue) != 1 {
+		t.Fatalf("preset created %d jobs and queued %d, want 3 jobs with only step 1 released", len(jobs), len(engine.queue))
+	}
+	wantProfiles := []string{"speed-read", "surface-read", "smart-long"}
+	for index, job := range jobs {
+		if job.ProfileID != wantProfiles[index] || job.SuiteID == "" || job.PresetID != PresetCompleteDriveCheck ||
+			job.SuiteStep != index+1 || job.SuiteTotal != 3 {
+			t.Fatalf("step %d = %+v", index+1, job)
+		}
+	}
+	<-engine.queue
+	first := jobs[0]
+	engine.finish(&first, core.JobCompleted, "")
+	if len(engine.queue) != 1 {
+		t.Fatalf("finishing step 1 released %d jobs, want step 2 only", len(engine.queue))
+	}
+	if next := <-engine.queue; next != jobs[1].ID {
+		t.Fatalf("released %q, want %q", next, jobs[1].ID)
+	}
+}
+
 func TestQueuedTestsForSameDriveRunSerially(t *testing.T) {
 	store, err := core.OpenStore(t.TempDir())
 	if err != nil {

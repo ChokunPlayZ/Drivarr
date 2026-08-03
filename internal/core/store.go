@@ -58,7 +58,7 @@ func defaultState() State {
 	profiles := make(map[string]TestProfile)
 	for _, item := range []TestProfile{
 		{ID: "smart-short", Name: "SMART short self-test", Kind: TestSMARTShort, BlockSizeKiB: 1024, QueueDepth: 1},
-		{ID: "smart-long", Name: "SMART extended self-test", Kind: TestSMARTLong, BlockSizeKiB: 1024, QueueDepth: 1},
+		{ID: "smart-long", Name: "SMART extended offline self-test", Kind: TestSMARTLong, BlockSizeKiB: 1024, QueueDepth: 1},
 		{ID: "smart-conveyance", Name: "SMART conveyance self-test", Kind: TestSMARTConvey, BlockSizeKiB: 1024, QueueDepth: 1},
 		{ID: "speed-read", Name: "Read speed and random IOPS", Kind: TestSpeed, BlockSizeKiB: 1024, QueueDepth: 1, DurationSeconds: 15},
 		{ID: "surface-read", Name: "Full non-destructive surface read", Kind: TestSurfaceRead, BlockSizeKiB: 1024, QueueDepth: 1},
@@ -90,8 +90,16 @@ func (s *Store) normalize() {
 	if s.state.Policies == nil {
 		s.state.Policies = make(map[string]Policy)
 	}
-	if len(s.state.Profiles) == 0 {
-		s.state.Profiles = defaultState().Profiles
+	if s.state.Profiles == nil {
+		s.state.Profiles = make(map[string]TestProfile)
+	}
+	for id, builtIn := range defaultState().Profiles {
+		if current, ok := s.state.Profiles[id]; !ok {
+			s.state.Profiles[id] = builtIn
+		} else if current.BuiltIn {
+			builtIn.CreatedAt = current.CreatedAt
+			s.state.Profiles[id] = builtIn
+		}
 	}
 	if s.state.Jobs == nil {
 		s.state.Jobs = make(map[string]Job)

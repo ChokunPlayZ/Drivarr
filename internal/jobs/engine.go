@@ -27,6 +27,8 @@ type SafetyResult struct {
 	Reasons []string `json:"reasons,omitempty"`
 }
 
+const PresetCompleteDriveCheck = "complete-drive-check"
+
 type DeviceRegistry interface {
 	Device(id string) (guard.DeviceState, bool)
 	Quarantine(id, reason string)
@@ -64,7 +66,7 @@ func (e *Engine) Run(ctx context.Context) {
 		go e.worker(ctx)
 	}
 	for _, job := range e.store.Jobs() {
-		if job.Status == core.JobQueued {
+		if job.Status == core.JobQueued && e.suiteStepReady(job) {
 			e.enqueue(job.ID)
 		}
 	}
@@ -91,6 +93,34 @@ func (e *Engine) enqueue(id string) {
 }
 
 func (e *Engine) Create(user core.User, device guard.DeviceState, kind core.TestKind, profileID, policyID, serialConfirmation string) (core.Job, error) {
+	return e.create(user, device, kind, profileID, policyID, serialConfirmation, true)
+}
+
+func (e *Engine) CreatePreset(user core.User, device guard.DeviceState, presetID, policyID string) ([]core.Job, error) {
+	if presetID != PresetCompleteDriveCheck {
+		return nil, errors.New("test preset is unavailable")
+	}
+	profiles := []string{"speed-read", "surface-read", "smart-long"}
+	jobs := make([]core.Job, 0, len(profiles))
+	suiteID := core.NewID("suite")
+	for index, profileID := range profiles {
+		job, err := e.create(user, device, "", profileID, policyID, "", false)
+		if err != nil {
+			return nil, err
+		}
+		job.SuiteID, job.PresetID = suiteID, presetID
+		job.SuiteStep, job.SuiteTotal = index+1, len(profiles)
+		if err := e.store.SaveJob(job); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	e.store.Audit(user.ID, "preset.create", suiteID, "", map[string]any{"preset": presetID, "device": device.ID, "jobs": len(jobs)})
+	e.enqueue(jobs[0].ID)
+	return jobs, nil
+}
+
+func (e *Engine) create(user core.User, device guard.DeviceState, kind core.TestKind, profileID, policyID, serialConfirmation string, enqueue bool) (core.Job, error) {
 	if device.Status != "ready" || device.Probe == nil {
 		return core.Job{}, errors.New("drive is not ready")
 	}
@@ -142,8 +172,42 @@ func (e *Engine) Create(user core.User, device guard.DeviceState, kind core.Test
 		return core.Job{}, err
 	}
 	e.store.Audit(user.ID, "job.create", job.ID, "", map[string]any{"kind": kind, "device": device.ID})
-	e.enqueue(job.ID)
+	if enqueue {
+		e.enqueue(job.ID)
+	}
 	return job, nil
+}
+
+func (e *Engine) suiteStepReady(job core.Job) bool {
+	if job.SuiteID == "" || job.SuiteStep <= 1 {
+		return true
+	}
+	for _, candidate := range e.store.Jobs() {
+		if candidate.SuiteID == job.SuiteID && candidate.SuiteStep == job.SuiteStep-1 {
+			switch candidate.Status {
+			case core.JobCompleted, core.JobWarning, core.JobFailed, core.JobCancelled:
+				return true
+			default:
+				return false
+			}
+		}
+	}
+	return false
+}
+
+func (e *Engine) enqueueNextSuiteStep(job core.Job) {
+	if job.SuiteID == "" || job.SuiteStep >= job.SuiteTotal {
+		return
+	}
+	if job.Status == core.JobInterrupted {
+		return
+	}
+	for _, candidate := range e.store.Jobs() {
+		if candidate.SuiteID == job.SuiteID && candidate.SuiteStep == job.SuiteStep+1 && candidate.Status == core.JobQueued {
+			e.enqueue(candidate.ID)
+			return
+		}
+	}
 }
 
 func (e *Engine) execute(parent context.Context, id string) {
@@ -418,6 +482,7 @@ func (e *Engine) finish(job *core.Job, status core.JobStatus, message string) {
 		job.Verdict = core.VerdictIncomplete
 	}
 	_ = e.store.SaveJob(*job)
+	e.enqueueNextSuiteStep(*job)
 }
 
 func (e *Engine) Pause(id string) error {

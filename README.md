@@ -21,6 +21,8 @@ requests, or hardware access.
 - Heuristic SMART-history consistency checks using independent FARM counters
 - Sequential throughput and random-read IOPS benchmarks
 - Full non-destructive bad-block scans with exact failing offsets
+- Ordered complete-drive preset: speed benchmark, full error scan, then extended
+  offline SMART self-test
 - Destructive chunked write/read CRC32C verification
 - Durable pause, resume, cancellation, restart checkpoints, and progress
 - Hardware-process deadlines, process-group isolation, circuit breaking, and
@@ -28,8 +30,8 @@ requests, or hardware access.
 - Local administrator, operator, and viewer accounts
 - Advanced validated test profiles and versioned grading policies
 - Immutable audit history and configurable report retention
-- Tamper-evident per-test and full-drive PDF reports, canonical JSON manifests,
-  and SHA-256 sidecars
+- Tamper-evident, test-aware per-test and full-drive PDF reports, canonical JSON
+  manifests, and SHA-256 sidecars
 - Built-in HTTPS certificate bootstrap for non-loopback listeners
 - Debian/Ubuntu systemd packaging
 

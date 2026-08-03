@@ -127,3 +127,57 @@ func TestGenerateDriveRejectsEmptyHistory(t *testing.T) {
 		t.Fatal("expected an empty drive history to be rejected")
 	}
 }
+
+func TestSpeedReportOnlyContainsRelevantMetrics(t *testing.T) {
+	dir := t.TempDir()
+	store, err := core.OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := core.Job{
+		ID: "job_speed", Kind: core.TestSpeed, Status: core.JobCompleted, Verdict: core.VerdictPass,
+		Progress: 1, CreatedAt: time.Now().UTC(), ReadBPS: 250_000_000, ReadIOPS: 180,
+		DurationSeconds: 15, QueueDepth: 1,
+	}
+	device := guard.DeviceState{ID: "sda", Path: "/dev/sda", Status: "ready", Probe: &guard.ProbeData{Model: "Test Drive"}}
+	value, err := Generate(dir, store, job, device, core.User{ID: "usr", Username: "operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(value.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(raw)
+	for _, expected := range []string{"SEQUENTIAL READ", "RANDOM READ", "TEST DURATION", "Benchmark phases"} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("speed report does not contain %q", expected)
+		}
+	}
+	for _, irrelevant := range []string{"Bytes checked", "Recorded I/O errors", "Surface Map", "Bad-block surface map"} {
+		if strings.Contains(content, irrelevant) {
+			t.Fatalf("speed report contains irrelevant section %q", irrelevant)
+		}
+	}
+}
+
+func TestDriveReportHidesSurfaceMapWithoutSurfaceTest(t *testing.T) {
+	dir := t.TempDir()
+	store, err := core.OpenStore(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job := core.Job{ID: "job_smart", Kind: core.TestSMARTLong, Status: core.JobCompleted, Verdict: core.VerdictPass, Progress: 1, CreatedAt: time.Now().UTC()}
+	device := guard.DeviceState{ID: "sda", Path: "/dev/sda", Status: "ready", Probe: &guard.ProbeData{Model: "Test Drive"}}
+	value, err := GenerateDrive(dir, store, device, []core.Job{job}, core.User{ID: "usr", Username: "operator"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(value.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "Bad-block surface map") {
+		t.Fatal("drive report displayed a bad-block section without a surface test")
+	}
+}
