@@ -777,11 +777,11 @@ func workerBadblocks(args []string, output io.Writer) error {
 const badblocksBlockSize = int64(4096)
 
 type badblocksReadPlan struct {
-	FirstBlock   int64
-	LastBlock    int64
+	FirstBlock    int64
+	LastBlock     int64
 	HasFullBlocks bool
-	TailOffset   int64
-	TailLength   int64
+	TailOffset    int64
+	TailLength    int64
 }
 
 func planBadblocksRead(offset, size int64) (badblocksReadPlan, error) {
