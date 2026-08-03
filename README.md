@@ -28,7 +28,8 @@ requests, or hardware access.
 - Local administrator, operator, and viewer accounts
 - Advanced validated test profiles and versioned grading policies
 - Immutable audit history and configurable report retention
-- Tamper-evident PDF reports, canonical JSON manifests, and SHA-256 sidecars
+- Tamper-evident per-test and full-drive PDF reports, canonical JSON manifests,
+  and SHA-256 sidecars
 - Built-in HTTPS certificate bootstrap for non-loopback listeners
 - Debian/Ubuntu systemd packaging
 

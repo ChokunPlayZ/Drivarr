@@ -38,6 +38,11 @@ paths:
       summary: Generate an immutable PDF report
       parameters: [{name: id, in: path, required: true, schema: {type: string}}]
       responses: {'201': {description: Report created}}
+  /devices/{id}/report:
+    post:
+      summary: Generate an immutable full-drive PDF containing every retained test
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'201': {description: Full drive report created}, '400': {description: No retained tests}}
   /reports:
     get: {summary: Issued reports, responses: {'200': {description: Reports}}}
   /profiles:
@@ -54,4 +59,3 @@ paths:
     put: {summary: Update system settings, responses: {'200': {description: Settings saved}}}
   /audit:
     get: {summary: Append-only audit history, responses: {'200': {description: Events}}}
-

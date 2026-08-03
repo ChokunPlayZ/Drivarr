@@ -140,7 +140,10 @@ type Job struct {
 
 type Report struct {
 	ID         string    `json:"id"`
-	JobID      string    `json:"jobId"`
+	JobID      string    `json:"jobId,omitempty"`
+	DeviceID   string    `json:"deviceId,omitempty"`
+	Scope      string    `json:"scope,omitempty"`
+	TestCount  int       `json:"testCount,omitempty"`
 	CreatedBy  string    `json:"createdBy"`
 	CreatedAt  time.Time `json:"createdAt"`
 	Path       string    `json:"path"`

@@ -38,6 +38,7 @@ func (a *api) registerApplicationRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/jobs/{id}/cancel", a.require(a.cancelJob, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports", a.require(a.listReports, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs/{id}/report", a.require(a.generateReport, core.RoleOperator, core.RoleAdmin))
+	mux.Handle("POST /api/v1/devices/{id}/report", a.require(a.generateDriveReport, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/download", a.require(a.downloadReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/checksum", a.require(a.downloadChecksum, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/verify", a.require(a.verifyReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
@@ -327,6 +328,35 @@ func (a *api) generateReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.store.Audit(requestUser(r).ID, "report.generate", value.ID, remoteIP(r), map[string]any{"job": job.ID})
+	writeJSON(w, http.StatusCreated, value)
+}
+
+func (a *api) generateDriveReport(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.PathValue("id")
+	device, ok := a.supervisor.Device(deviceID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "device not found"})
+		return
+	}
+	allJobs := a.store.Jobs()
+	deviceJobs := make([]core.Job, 0)
+	for _, job := range allJobs {
+		if job.DeviceID == deviceID {
+			deviceJobs = append(deviceJobs, job)
+		}
+	}
+	if len(deviceJobs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "drive has no retained tests to report"})
+		return
+	}
+	value, err := report.GenerateDrive(a.dataDir, a.store, device, deviceJobs, requestUser(r))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	a.store.Audit(requestUser(r).ID, "report.generate_drive", value.ID, remoteIP(r), map[string]any{
+		"device": deviceID, "tests": len(deviceJobs),
+	})
 	writeJSON(w, http.StatusCreated, value)
 }
 
