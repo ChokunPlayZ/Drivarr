@@ -33,6 +33,7 @@ func (a *api) registerApplicationRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/profiles", a.require(a.saveProfile, core.RoleAdmin))
 	mux.Handle("GET /api/v1/jobs", a.require(a.listJobs, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs", a.require(a.createJob, core.RoleOperator, core.RoleAdmin))
+	mux.Handle("DELETE /api/v1/jobs/{id}", a.require(a.deleteJob, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs/{id}/pause", a.require(a.pauseJob, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs/{id}/resume", a.require(a.resumeJob, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs/{id}/cancel", a.require(a.cancelJob, core.RoleOperator, core.RoleAdmin))
@@ -286,6 +287,20 @@ func (a *api) createJob(w http.ResponseWriter, r *http.Request) {
 func (a *api) pauseJob(w http.ResponseWriter, r *http.Request)  { a.jobAction(w, r, "pause") }
 func (a *api) resumeJob(w http.ResponseWriter, r *http.Request) { a.jobAction(w, r, "resume") }
 func (a *api) cancelJob(w http.ResponseWriter, r *http.Request) { a.jobAction(w, r, "cancel") }
+
+func (a *api) deleteJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if err := a.jobs.Delete(id); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, core.ErrNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	a.store.Audit(requestUser(r).ID, "job.delete", id, remoteIP(r), nil)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
 
 func (a *api) jobAction(w http.ResponseWriter, r *http.Request, action string) {
 	id := r.PathValue("id")

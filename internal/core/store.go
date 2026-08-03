@@ -513,6 +513,20 @@ func (s *Store) SaveJob(job Job) error {
 	return s.persistLocked()
 }
 
+func (s *Store) DeleteIncompleteJob(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	job, ok := s.state.Jobs[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if job.Status != JobFailed && job.Status != JobCancelled && job.Status != JobInterrupted {
+		return errors.New("only failed, cancelled, or interrupted jobs can be deleted")
+	}
+	delete(s.state.Jobs, id)
+	return s.persistLocked()
+}
+
 func (s *Store) Job(id string) (Job, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

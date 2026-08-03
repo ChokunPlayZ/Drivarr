@@ -475,6 +475,10 @@ func (e *Engine) Cancel(id string) error {
 	return nil
 }
 
+func (e *Engine) Delete(id string) error {
+	return e.store.DeleteIncompleteJob(id)
+}
+
 func (e *Engine) cancelActive(id string) {
 	e.mu.Lock()
 	cancel := e.running[id]

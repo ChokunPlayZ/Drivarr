@@ -18,6 +18,11 @@ paths:
   /jobs:
     get: {summary: Test history and progress, responses: {'200': {description: Jobs}}}
     post: {summary: Queue a test profile, responses: {'201': {description: Job created}}}
+  /jobs/{id}:
+    delete:
+      summary: Delete a failed, cancelled, or interrupted test
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Job deleted}, '400': {description: Job is not deletable}, '404': {description: Job not found}}
   /jobs/{id}/pause:
     post:
       summary: Pause a checkpointable test

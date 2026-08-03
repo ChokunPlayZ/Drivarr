@@ -4,6 +4,7 @@ import {createRoot} from "react-dom/client";
 const emptyData={devices:[],jobs:[],reports:[],settings:null,policies:[],profiles:[]};
 const activeStatuses=["queued","validating","running","pause_requested"];
 const reportableStatuses=["completed","completed_with_warnings","failed","cancelled","interrupted"];
+const deletableStatuses=["failed","cancelled","interrupted"];
 const fmtBytes=(bytes=0)=>{if(!bytes)return "—";const units=["B","KB","MB","GB","TB"];let value=bytes,index=0;while(value>=1000&&index<units.length-1){value/=1000;index++}return `${value.toFixed(index>2?2:0)} ${units[index]}`};
 const fmtSpeed=value=>value?`${fmtBytes(value)}/s`:"—";
 const fmtDate=value=>value?new Date(value).toLocaleString():"—";
@@ -54,11 +55,13 @@ function Login({onLogin}){
 function JobActions({job,role,onAction,verbose=false}){
   if(role==="viewer")return null;
   const active=activeStatuses.includes(job.status);
+  function remove(){if(confirm("Delete this incomplete test? This cannot be undone."))onAction(job,"delete")}
   return <div className={verbose?"workspace-actions":"actions"}>
     {job.status==="running"&&["surface_read","destructive_verify"].includes(job.kind)&&<button className={verbose?"tonal":""} onClick={()=>onAction(job,"pause")}>{verbose?"Pause test":"Pause"}</button>}
     {["paused","interrupted"].includes(job.status)&&<button className={verbose?"filled":""} onClick={()=>onAction(job,"resume")}>{verbose?"Resume test":"Resume"}</button>}
     {(active||job.status==="paused")&&<button className={verbose?"text-button":""} onClick={()=>onAction(job,"cancel")}>{verbose?"Cancel test":"Cancel"}</button>}
     {reportableStatuses.includes(job.status)&&<button className={verbose?"tonal":""} onClick={()=>onAction(job,"report")}>{verbose?"Generate PDF":"PDF"}</button>}
+    {deletableStatuses.includes(job.status)&&<button className="text-button" onClick={remove}>{verbose?"Delete test":"Delete"}</button>}
   </div>;
 }
 function JobsTable({jobs,role,onAction,onOpen,devices}){
@@ -145,7 +148,7 @@ function App(){
   async function mutate(path,options,message,after=refreshAll){try{const result=await request(path,options);if(message)notify(typeof message==="function"?message(result):message);await after(user);return result}catch(error){handleError(error);throw error}}
   async function login(credentials){const session=await request("/api/v1/auth/login",{method:"POST",body:JSON.stringify(credentials)});setUser(session);await refreshAll(session)}
   async function logout(){await request("/api/v1/auth/logout",{method:"POST"}).catch(()=>{});setUser(null);setWorkspaceId(null)}
-  async function jobAction(job,action){await mutate(`/api/v1/jobs/${job.id}/${action}`,{method:"POST"},`${action} requested`)}
+  async function jobAction(job,action){if(action==="delete"){await mutate(`/api/v1/jobs/${job.id}`,{method:"DELETE"},"Test deleted");return}await mutate(`/api/v1/jobs/${job.id}/${action}`,{method:"POST"},`${action} requested`)}
   async function driveReport(id){await mutate(`/api/v1/devices/${encodeURIComponent(id)}/report`,{method:"POST"},result=>`Full PDF created with ${result.testCount} tests`)}
   const workspaceDevice=data.devices.find(device=>device.id===workspaceId);
   if(user===undefined)return <div className="login-shell"><div className="login-card"><p className="supporting">Loading Drivarr…</p></div></div>;

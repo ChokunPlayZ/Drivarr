@@ -135,3 +135,35 @@ func TestQueuedTestsForSameDriveRunSerially(t *testing.T) {
 		t.Fatalf("%d tests ran on the same drive at once, want 1", got)
 	}
 }
+
+func TestDeleteOnlyRemovesIncompleteOrFailedJobs(t *testing.T) {
+	store, err := core.OpenStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine := NewEngine(store, fakeRunner{}, "drivarrd", fakeDevices{},
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, status := range []core.JobStatus{core.JobFailed, core.JobCancelled, core.JobInterrupted} {
+		job := core.Job{ID: "job_" + string(status), Status: status, CreatedAt: time.Now().UTC()}
+		if err := store.SaveJob(job); err != nil {
+			t.Fatal(err)
+		}
+		if err := engine.Delete(job.ID); err != nil {
+			t.Fatalf("delete %s job: %v", status, err)
+		}
+		if _, exists := store.Job(job.ID); exists {
+			t.Fatalf("%s job still exists after deletion", status)
+		}
+	}
+
+	completed := core.Job{ID: "job_completed", Status: core.JobCompleted, CreatedAt: time.Now().UTC()}
+	if err := store.SaveJob(completed); err != nil {
+		t.Fatal(err)
+	}
+	if err := engine.Delete(completed.ID); err == nil {
+		t.Fatal("completed job was deletable")
+	}
+	if _, exists := store.Job(completed.ID); !exists {
+		t.Fatal("completed job was removed")
+	}
+}
