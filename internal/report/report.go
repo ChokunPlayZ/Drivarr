@@ -358,8 +358,12 @@ func reportHeader(c *pdfCanvas, organization, title, reportID, dataHash string, 
 	if organization == "" {
 		organization = "DRIVARR"
 	}
+	brand := "DRIVARR"
+	if normalized := strings.ToUpper(organization); normalized != "DRIVARR" {
+		brand += " / " + normalized
+	}
 	c.rect(0, 732, 612, 110, pdfPurple)
-	c.text(42, 801, 10, "DRIVARR / "+strings.ToUpper(truncatePDF(organization, 52)), true, pdfWhite)
+	c.text(42, 801, 10, truncatePDF(brand, 62), true, pdfWhite)
 	c.text(42, 767, 24, title, true, pdfWhite)
 	c.text(520, 801, 8, fmt.Sprintf("PAGE %d / %d", page, pageCount), true, pdfWhite)
 	c.text(42, 26, 7, "Report "+reportID+"  |  Data SHA-256 "+truncatePDF(dataHash, 24)+"...", false, pdfMuted)
@@ -486,7 +490,7 @@ func makeStyledJobPDF(value Manifest, dataHash string) []byte {
 	drawHealthCounters(pages[0], value.Device.Probe, 555)
 	drawSMARTTable(pages[0], value.Device.Probe, 455)
 	pages[0].text(42, 117, 8, "ASSESSMENT NOTE", true, pdfMuted)
-	pages[0].wrappedText(42, 100, 8, "Drive health is based on the captured SMART snapshot, media counters, test results, and the grading policy recorded in the immutable manifest.", 100, 11, false, pdfMuted)
+	pages[0].wrappedText(42, 100, 8, "Generated "+formatPDFTime(value.GeneratedAt)+" by "+value.GeneratedBy+". Drive health is based on the captured SMART snapshot, media counters, test results, and the grading policy recorded in the immutable manifest.", 100, 11, false, pdfMuted)
 
 	drawJobEvidence(pages[1], value.Job)
 	drawIntegrityBlock(pages[1], value.ReportID, dataHash, 132)
@@ -559,14 +563,15 @@ func makeStyledDrivePDF(value DriveManifest, dataHash string) []byte {
 	drawHealthCounters(pages[0], value.Device.Probe, 555)
 	drawSMARTTable(pages[0], value.Device.Probe, 455)
 	pages[0].text(42, 117, 8, "REPORT COVERAGE", true, pdfMuted)
-	pages[0].wrappedText(42, 100, 8, fmt.Sprintf("This full-drive report includes %d retained tests in chronological order. The JSON manifest is the canonical evidence record.", len(value.Jobs)), 100, 11, false, pdfMuted)
+	pages[0].wrappedText(42, 100, 8, fmt.Sprintf("Generated %s by %s. This full-drive report includes %d retained tests in chronological order. The JSON manifest is the canonical evidence record.", formatPDFTime(value.GeneratedAt), value.GeneratedBy, len(value.Jobs)), 100, 11, false, pdfMuted)
 	for pageIndex := 1; pageIndex < pageCount; pageIndex++ {
 		start := (pageIndex - 1) * jobsPerPage
 		end := min(start+jobsPerPage, len(value.Jobs))
 		drawDriveJobs(pages[pageIndex], value.Jobs[start:end], start, len(value.Jobs), verdict)
 		if pageIndex == pageCount-1 {
-			drawSurfaceMap(pages[pageIndex], value.Jobs, 292)
-			drawIntegrityBlock(pages[pageIndex], value.ReportID, dataHash, 105)
+			mapY := 430.0 - float64(max(0, len(value.Jobs[start:end])-3))*28
+			drawSurfaceMap(pages[pageIndex], value.Jobs, mapY)
+			drawIntegrityBlock(pages[pageIndex], value.ReportID, dataHash, mapY-200)
 		}
 	}
 	return buildStyledPDF(pages)
@@ -578,7 +583,7 @@ func drawDriveJobs(c *pdfCanvas, jobs []core.Job, offset, total int, verdict cor
 	c.text(42, 684, 9, fmt.Sprintf("Tests %d-%d of %d", offset+1, offset+len(jobs), total), false, pdfMuted)
 	c.rect(42, 646, 528, 22, pdfPurple)
 	headings := []string{"Test", "Profile / kind", "Status", "Progress", "Performance"}
-	xs := []float64{49, 91, 312, 405, 470}
+	xs := []float64{49, 130, 350, 430, 490}
 	for index, heading := range headings {
 		c.text(xs[index], 654, 7, strings.ToUpper(heading), true, pdfWhite)
 	}
@@ -588,11 +593,11 @@ func drawDriveJobs(c *pdfCanvas, jobs []core.Job, offset, total int, verdict cor
 			c.rect(42, rowY-11, 528, 31, pdfPaper)
 		}
 		profile := fallbackPDF(job.ProfileName, string(job.Kind))
-		c.text(49, rowY, 8, truncatePDF(job.ID, 11), true, pdfInk)
-		c.text(91, rowY, 8, truncatePDF(profile, 31), true, pdfInk)
-		c.text(312, rowY, 8, truncatePDF(string(job.Status), 19), false, pdfInk)
-		c.text(405, rowY, 8, fmt.Sprintf("%.1f%%", job.Progress*100), false, pdfInk)
-		c.text(470, rowY, 8, truncatePDF(formatPDFRate(job.ReadBPS), 16), false, pdfInk)
+		c.text(49, rowY, 8, truncatePDF(job.ID, 13), true, pdfInk)
+		c.text(130, rowY, 8, truncatePDF(profile, 31), true, pdfInk)
+		c.text(350, rowY, 8, truncatePDF(string(job.Status), 16), false, pdfInk)
+		c.text(430, rowY, 8, fmt.Sprintf("%.1f%%", job.Progress*100), false, pdfInk)
+		c.text(490, rowY, 8, truncatePDF(formatPDFRate(job.ReadBPS), 13), false, pdfInk)
 		c.line(42, rowY-13, 570, rowY-13)
 		rowY -= 39
 	}

@@ -37,6 +37,11 @@ func TestGenerateAndVerifyPDF(t *testing.T) {
 	if !strings.HasPrefix(string(raw), "%PDF-1.4") {
 		t.Fatal("generated file is not a PDF")
 	}
+	for _, expected := range []string{"Drive Diagnostic Report", "SMART attributes", "/BaseFont /Helvetica-Bold", "0.310 0.220 0.550 rg", "/Count 2"} {
+		if !strings.Contains(string(raw), expected) {
+			t.Fatalf("styled PDF does not contain %q", expected)
+		}
+	}
 	valid, err := Verify(value)
 	if err != nil || !valid {
 		t.Fatalf("expected valid report: valid=%v err=%v", valid, err)
@@ -88,7 +93,7 @@ func TestGenerateDriveIncludesEveryRetainedTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"Full Drive Diagnostic Report", "job_smart", "job_surface", "/Count 2"} {
+	for _, expected := range []string{"Full Drive Diagnostic Report", "Retained Test Evidence", "job_smart", "job_surface", "/BaseFont /Helvetica-Bold", "/Count 2"} {
 		if !strings.Contains(string(rawPDF), expected) {
 			t.Fatalf("PDF does not contain %q", expected)
 		}
