@@ -118,16 +118,29 @@ func (a *api) login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid username or password"})
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: "drivarr_session", Value: token, Path: "/", HttpOnly: true,
-		Secure: r.TLS != nil, SameSite: http.SameSiteStrictMode, MaxAge: 12 * 60 * 60,
-	})
+	http.SetCookie(w, newSessionCookie(token, r.TLS != nil))
+	w.Header().Set("Cache-Control", "no-store")
 	a.store.Audit(user.ID, "auth.login", user.ID, remoteIP(r), nil)
 	writeJSON(w, http.StatusOK, user)
 }
 
 func (a *api) session(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, requestUser(r))
+}
+
+func newSessionCookie(token string, secure bool) *http.Cookie {
+	const lifetime = 12 * time.Hour
+	return &http.Cookie{
+		Name:     "drivarr_session",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(lifetime / time.Second),
+		Expires:  time.Now().UTC().Add(lifetime),
+	}
 }
 
 func (a *api) logout(w http.ResponseWriter, r *http.Request) {
