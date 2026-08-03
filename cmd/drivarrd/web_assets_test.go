@@ -22,3 +22,12 @@ func TestFrontendDoesNotUseCSPBlockedInlineStyles(t *testing.T) {
 		t.Fatal("app.js contains an inline style, but the application CSP forbids inline styles")
 	}
 }
+
+func TestGeneratedReportsStartAFileDownload(t *testing.T) {
+	if !strings.Contains(appJS, "location.assign") {
+		t.Fatal("generated reports are not sent to the browser download endpoint")
+	}
+	if !strings.Contains(appJS, "/download") {
+		t.Fatal("frontend bundle does not contain the report download route")
+	}
+}

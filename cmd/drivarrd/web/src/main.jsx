@@ -10,6 +10,7 @@ const fmtSpeed=value=>value?`${fmtBytes(value)}/s`:"—";
 const fmtDate=value=>value?new Date(value).toLocaleString():"—";
 const statusLabel=value=>String(value||"unknown").replaceAll("_"," ");
 const deviceURL=id=>`/drives/${encodeURIComponent(id)}`;
+const reportDownloadURL=id=>`/api/v1/reports/${encodeURIComponent(id)}/download`;
 const routeDevice=()=>location.pathname.startsWith("/drives/")?decodeURIComponent(location.pathname.slice(8).split("/")[0]||""):null;
 
 async function request(path,options={}){
@@ -84,7 +85,7 @@ function DeviceCard({device,jobs,role,onOpen,onTest,onReport,onRetry}){
 
 function ReportsTable({reports,onVerify}){
   if(!reports.length)return <div className="empty">Generate a PDF from a completed test.</div>;
-  return <table><thead><tr><th>Report</th><th>Coverage</th><th>Verdict</th><th>Created</th><th>Integrity</th><th>Download</th></tr></thead><tbody>{reports.map(report=><tr key={report.id}><td><strong>{report.id}</strong></td><td>{report.scope==="drive"?`Full drive · ${report.testCount} test${report.testCount===1?"":"s"}`:report.jobId}</td><td><Status value={report.verdict==="pass"?"completed":report.verdict}>{report.verdict}</Status></td><td>{fmtDate(report.createdAt)}</td><td><button onClick={()=>onVerify(report.id)}>Verify</button></td><td><a href={`/api/v1/reports/${encodeURIComponent(report.id)}/download`}>PDF</a> · <a href={`/api/v1/reports/${encodeURIComponent(report.id)}/checksum`}>SHA-256</a></td></tr>)}</tbody></table>;
+  return <table><thead><tr><th>Report</th><th>Coverage</th><th>Verdict</th><th>Created</th><th>Integrity</th><th>Download</th></tr></thead><tbody>{reports.map(report=><tr key={report.id}><td><strong>{report.id}</strong></td><td>{report.scope==="drive"?`Full drive · ${report.testCount} test${report.testCount===1?"":"s"}`:report.jobId}</td><td><Status value={report.verdict==="pass"?"completed":report.verdict}>{report.verdict}</Status></td><td>{fmtDate(report.createdAt)}</td><td><button onClick={()=>onVerify(report.id)}>Verify</button></td><td><a href={reportDownloadURL(report.id)}>PDF</a> · <a href={`/api/v1/reports/${encodeURIComponent(report.id)}/checksum`}>SHA-256</a></td></tr>)}</tbody></table>;
 }
 
 function SurfaceMap({job}){
@@ -146,10 +147,11 @@ function App(){
   function openWorkspace(id){setWorkspaceId(id);if(location.pathname!==deviceURL(id))history.pushState({deviceId:id},"",deviceURL(id))}
   function closeWorkspace(){setWorkspaceId(null);if(routeDevice())history.pushState({},"","/")}
   async function mutate(path,options,message,after=refreshAll){try{const result=await request(path,options);if(message)notify(typeof message==="function"?message(result):message);await after(user);return result}catch(error){handleError(error);throw error}}
+  async function generateAndDownloadReport(path,message){try{const result=await request(path,{method:"POST"});notify(typeof message==="function"?message(result):message);location.assign(reportDownloadURL(result.id));await refreshAll(user);return result}catch(error){handleError(error);throw error}}
   async function login(credentials){const session=await request("/api/v1/auth/login",{method:"POST",body:JSON.stringify(credentials)});setUser(session);await refreshAll(session)}
   async function logout(){await request("/api/v1/auth/logout",{method:"POST"}).catch(()=>{});setUser(null);setWorkspaceId(null)}
-  async function jobAction(job,action){if(action==="delete"){await mutate(`/api/v1/jobs/${job.id}`,{method:"DELETE"},"Test deleted");return}await mutate(`/api/v1/jobs/${job.id}/${action}`,{method:"POST"},`${action} requested`)}
-  async function driveReport(id){await mutate(`/api/v1/devices/${encodeURIComponent(id)}/report`,{method:"POST"},result=>`Full PDF created with ${result.testCount} tests`)}
+  async function jobAction(job,action){if(action==="delete"){await mutate(`/api/v1/jobs/${job.id}`,{method:"DELETE"},"Test deleted");return}if(action==="report"){await generateAndDownloadReport(`/api/v1/jobs/${job.id}/report`,"PDF created; download started");return}await mutate(`/api/v1/jobs/${job.id}/${action}`,{method:"POST"},`${action} requested`)}
+  async function driveReport(id){await generateAndDownloadReport(`/api/v1/devices/${encodeURIComponent(id)}/report`,result=>`Full PDF created with ${result.testCount} tests; download started`)}
   const workspaceDevice=data.devices.find(device=>device.id===workspaceId);
   if(user===undefined)return <div className="login-shell"><div className="login-card"><p className="supporting">Loading Drivarr…</p></div></div>;
   if(!user)return <Login onLogin={login}/>;
