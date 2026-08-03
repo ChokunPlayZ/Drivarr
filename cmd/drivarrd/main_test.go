@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -64,5 +66,28 @@ func TestFarmStringReadsDriveInformation(t *testing.T) {
 	}
 	if got := farmString(farm, "page_1_drive_information", "missing"); got != "" {
 		t.Fatalf("missing FARM field = %q, want empty", got)
+	}
+}
+
+func TestKernelCapacityBoundsSMARTCapacity(t *testing.T) {
+	sysBlockDir := t.TempDir()
+	deviceDir := filepath.Join(sysBlockDir, "sda")
+	if err := os.Mkdir(deviceDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deviceDir, "size"), []byte("19532873727\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	kernelCapacity, err := kernelDeviceCapacityAt("/dev/sda", sysBlockDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = int64(10_000_831_348_224)
+	if kernelCapacity != want {
+		t.Fatalf("kernel capacity = %d, want %d", kernelCapacity, want)
+	}
+	if got := boundedDeviceCapacity(10_000_831_348_736, kernelCapacity); got != want {
+		t.Fatalf("bounded capacity = %d, want %d", got, want)
 	}
 }

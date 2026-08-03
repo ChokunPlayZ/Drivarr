@@ -384,6 +384,10 @@ func workerProbe(device string, output io.Writer) error {
 		report.UserCapacity.Bytes, report.WWN.NAA, report.WWN.OUI, report.WWN.ID)
 	fingerprintHash := sha256.Sum256([]byte(fingerprint))
 	id := "dev_" + hex.EncodeToString(fingerprintHash[:8])
+	capacity := report.UserCapacity.Bytes
+	if kernelCapacity, capacityErr := kernelDeviceCapacityAt(device, "/sys/class/block"); capacityErr == nil {
+		capacity = boundedDeviceCapacity(capacity, kernelCapacity)
+	}
 	var reallocated, pending, uncorrectable int64
 	attributes := make([]guard.SMARTAttribute, 0, len(report.ATASMARTAttributes.Table))
 	for _, attribute := range report.ATASMARTAttributes.Table {
@@ -423,7 +427,7 @@ func workerProbe(device string, output io.Writer) error {
 		Serial:          report.SerialNumber,
 		Firmware:        report.Firmware,
 		Protocol:        report.Device.Protocol,
-		Capacity:        report.UserCapacity.Bytes,
+		Capacity:        capacity,
 		SMARTAvailable:  report.SMARTStatus != nil,
 		SMARTPassed:     report.SMARTStatus != nil && report.SMARTStatus.Passed,
 		SMARTSelfTest:   detectSMARTSelfTest(rawReport),
@@ -439,6 +443,28 @@ func workerProbe(device string, output io.Writer) error {
 		RecordingType:   recordingType,
 		CollectedUTC:    time.Now().UTC(),
 	})
+}
+
+// sysfs exposes a block device's kernel-addressable size as a count of
+// 512-byte sectors, independent of its logical and physical sector sizes.
+func kernelDeviceCapacityAt(device, sysBlockDir string) (int64, error) {
+	raw, err := os.ReadFile(filepath.Join(sysBlockDir, filepath.Base(device), "size"))
+	if err != nil {
+		return 0, err
+	}
+	sectors, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
+	const maxInt64 = int64(^uint64(0) >> 1)
+	if err != nil || sectors <= 0 || sectors > maxInt64/512 {
+		return 0, errors.New("invalid kernel block-device size")
+	}
+	return sectors * 512, nil
+}
+
+func boundedDeviceCapacity(smartCapacity, kernelCapacity int64) int64 {
+	if kernelCapacity > 0 && (smartCapacity <= 0 || kernelCapacity < smartCapacity) {
+		return kernelCapacity
+	}
+	return smartCapacity
 }
 
 func detectSMARTSelfTest(report map[string]any) *guard.SMARTSelfTest {
@@ -702,21 +728,26 @@ func workerBadblocks(args []string, output io.Writer) error {
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if *device == "" || !strings.HasPrefix(*device, "/dev/") || *offset < 0 || *size <= 0 {
+	if *device == "" || !strings.HasPrefix(*device, "/dev/") {
 		return errors.New("valid device range required")
 	}
-	badblocks, err := exec.LookPath("badblocks")
+	plan, err := planBadblocksRead(*offset, *size)
 	if err != nil {
-		return fmt.Errorf("badblocks unavailable: %w", err)
+		return err
 	}
-	const blockSize = int64(4096)
-	first := *offset / blockSize
-	last := (*offset+*size)/blockSize - 1
-	command := exec.Command(badblocks, "-b", strconv.FormatInt(blockSize, 10), "-s", "-v",
-		*device, strconv.FormatInt(last, 10), strconv.FormatInt(first, 10))
-	command.Stderr = os.Stderr
 	started := time.Now()
-	raw, runErr := command.Output()
+	var raw []byte
+	var runErr error
+	if plan.HasFullBlocks {
+		badblocks, lookErr := exec.LookPath("badblocks")
+		if lookErr != nil {
+			return fmt.Errorf("badblocks unavailable: %w", lookErr)
+		}
+		command := exec.Command(badblocks, "-b", strconv.FormatInt(badblocksBlockSize, 10), "-s", "-v",
+			*device, strconv.FormatInt(plan.LastBlock, 10), strconv.FormatInt(plan.FirstBlock, 10))
+		command.Stderr = os.Stderr
+		raw, runErr = command.Output()
+	}
 	elapsed := time.Since(started)
 	result := jobs.ChunkResult{}
 	if elapsed > 0 {
@@ -726,14 +757,70 @@ func workerBadblocks(args []string, output io.Writer) error {
 		block, parseErr := strconv.ParseInt(line, 10, 64)
 		if parseErr == nil {
 			result.Errors = append(result.Errors, core.SectorError{
-				Offset: block * blockSize, Length: blockSize, Message: "unreadable block",
+				Offset: block * badblocksBlockSize, Length: badblocksBlockSize, Message: "unreadable block",
 			})
 		}
 	}
 	if runErr != nil && len(result.Errors) == 0 {
 		return fmt.Errorf("badblocks failed: %w", runErr)
 	}
+	if plan.TailLength > 0 {
+		if tailErr := readExactRange(*device, plan.TailOffset, plan.TailLength); tailErr != nil {
+			result.Errors = append(result.Errors, core.SectorError{
+				Offset: plan.TailOffset, Length: plan.TailLength, Message: "unreadable trailing range",
+			})
+		}
+	}
 	return json.NewEncoder(output).Encode(result)
+}
+
+const badblocksBlockSize = int64(4096)
+
+type badblocksReadPlan struct {
+	FirstBlock   int64
+	LastBlock    int64
+	HasFullBlocks bool
+	TailOffset   int64
+	TailLength   int64
+}
+
+func planBadblocksRead(offset, size int64) (badblocksReadPlan, error) {
+	const maxInt64 = int64(^uint64(0) >> 1)
+	if offset < 0 || size <= 0 || offset%badblocksBlockSize != 0 || offset > maxInt64-size {
+		return badblocksReadPlan{}, errors.New("valid aligned device range required")
+	}
+	end := offset + size
+	fullEnd := end - end%badblocksBlockSize
+	plan := badblocksReadPlan{
+		FirstBlock: offset / badblocksBlockSize,
+		TailOffset: fullEnd,
+		TailLength: end - fullEnd,
+	}
+	if fullEnd > offset {
+		plan.HasFullBlocks = true
+		plan.LastBlock = fullEnd/badblocksBlockSize - 1
+	}
+	return plan, nil
+}
+
+func readExactRange(path string, offset, length int64) error {
+	if offset < 0 || length <= 0 || length >= badblocksBlockSize {
+		return errors.New("invalid trailing range")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	buffer := make([]byte, int(length))
+	read, err := file.ReadAt(buffer, offset)
+	if err != nil {
+		return err
+	}
+	if int64(read) != length {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 
 func workerSafety(args []string, output io.Writer) error {
