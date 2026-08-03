@@ -294,6 +294,7 @@ func (a *api) web(w http.ResponseWriter, r *http.Request) {
 		data = indexHTML
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	}
+	w.Header().Set("Cache-Control", "no-cache")
 	_, _ = io.WriteString(w, data)
 }
 

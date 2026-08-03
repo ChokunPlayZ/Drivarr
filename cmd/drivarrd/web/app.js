@@ -129,7 +129,7 @@ async function refreshAdmin(){
  $("#audit").innerHTML=`<table><thead><tr><th>Time</th><th>Action</th><th>User</th><th>Target</th></tr></thead><tbody>${audit.events.map(e=>`<tr><td>${fmtDate(e.at)}</td><td>${escapeHTML(e.action)}</td><td>${escapeHTML(e.userId||"system")}</td><td>${escapeHTML(e.target||"—")}</td></tr>`).join("")}</tbody></table>`;
 }
 async function refreshDevices(){try{await api("/api/v1/discovery/refresh",{method:"POST"});notify("Drive discovery started");setTimeout(refreshAll,1000)}catch(e){notify(e.message,true)}}
-$("#refresh").addEventListener("click",refreshDevices);$("#refresh-devices").addEventListener("click",refreshDevices);
+$("#refresh-devices")?.addEventListener("click",refreshDevices);
 $("#devices").addEventListener("click",async e=>{
  const retry=e.target.closest(".retry");if(retry){await api(`/api/v1/devices/${encodeURIComponent(retry.dataset.id)}/retry`,{method:"POST"});notify("Manual probe scheduled");return}
  const start=e.target.closest(".start");if(!start)return;const d=state.devices.find(x=>x.id===start.dataset.id),p=d.probe||{},form=$("#test-form");form.elements.deviceId.value=d.id;form.elements.serialConfirmation.value="";form.elements.reauthPassword.value="";$("#test-drive-name").textContent=p.model||d.name;form.dataset.serial=p.serial||"";const selected=state.profiles.find(x=>x.id===form.elements.profileId.value);$("#destructive-warning").hidden=selected?.kind!=="destructive_verify";$("#test-dialog").showModal();
