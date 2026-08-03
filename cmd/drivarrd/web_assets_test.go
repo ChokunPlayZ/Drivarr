@@ -15,3 +15,9 @@ func TestFrontendListenerTargetsExist(t *testing.T) {
 		}
 	}
 }
+
+func TestFrontendDoesNotUseCSPBlockedInlineStyles(t *testing.T) {
+	if strings.Contains(appJS, "style=") {
+		t.Fatal("app.js contains an inline style, but the application CSP forbids inline styles")
+	}
+}
