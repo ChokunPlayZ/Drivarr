@@ -715,8 +715,13 @@ func workerBadblocks(args []string, output io.Writer) error {
 	command := exec.Command(badblocks, "-b", strconv.FormatInt(blockSize, 10), "-s", "-v",
 		*device, strconv.FormatInt(last, 10), strconv.FormatInt(first, 10))
 	command.Stderr = os.Stderr
+	started := time.Now()
 	raw, runErr := command.Output()
+	elapsed := time.Since(started)
 	result := jobs.ChunkResult{}
+	if elapsed > 0 {
+		result.ReadBPS = int64(float64(*size) / elapsed.Seconds())
+	}
 	for _, line := range strings.Fields(string(raw)) {
 		block, parseErr := strconv.ParseInt(line, 10, 64)
 		if parseErr == nil {
