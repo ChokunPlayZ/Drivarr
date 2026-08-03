@@ -8,7 +8,7 @@ import (
 
 func TestDiscoverAtReturnsSortedWholePhysicalDevices(t *testing.T) {
 	sysBlockDir := t.TempDir()
-	for _, name := range []string{"sdb", "loop0", "sda", "nvme0n1", "nvme0n1p1", "dm-0", "md0", "ram0"} {
+	for _, name := range []string{"sdb", "loop0", "sda", "nvme0n1", "nvme0n1p1", "dm-0", "md0", "ram0", "mmcblk0", "mmcblk0boot0"} {
 		if err := os.Mkdir(filepath.Join(sysBlockDir, name), 0o755); err != nil {
 			t.Fatal(err)
 		}

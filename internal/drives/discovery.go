@@ -32,7 +32,8 @@ func discoverAt(sysBlockDir, devDir string) ([]Device, error) {
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") ||
-			strings.HasPrefix(name, "dm-") || strings.HasPrefix(name, "md") {
+			strings.HasPrefix(name, "dm-") || strings.HasPrefix(name, "md") ||
+			strings.HasPrefix(name, "mmcblk") {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(sysBlockDir, name, "partition")); err == nil {
