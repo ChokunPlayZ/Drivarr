@@ -57,14 +57,18 @@ causing an unlimited retry cascade.
 
 ## Development
 
-Requirements: Go 1.24 or newer. Hardware tests additionally require
+Requirements: Go 1.24 or newer and Node.js 20 or newer. Hardware tests additionally require
 `smartmontools`, `fio`, and `e2fsprogs`.
 
 ```sh
+npm install
 make test
 make build
 DRIVARR_BOOTSTRAP_PASSWORD='replace-with-a-long-password' make run
 ```
+
+The web interface is a React application in `cmd/drivarrd/web/src`. `make build`
+bundles it with esbuild before embedding the generated JavaScript in the daemon.
 
 `make build` creates the daemon at `build/drivarrd` and the local administration
 CLI at `build/drivarrctl`.

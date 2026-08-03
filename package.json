@@ -1,0 +1,15 @@
+{
+  "name": "drivarr-ui",
+  "private": true,
+  "scripts": {
+    "build:ui": "esbuild cmd/drivarrd/web/src/main.jsx --bundle --minify --format=esm --target=es2022 --outfile=cmd/drivarrd/web/app.js",
+    "watch:ui": "npm run build:ui -- --watch"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.8"
+  }
+}
