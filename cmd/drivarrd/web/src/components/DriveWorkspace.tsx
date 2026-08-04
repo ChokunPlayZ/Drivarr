@@ -22,7 +22,6 @@ import {
   Chip,
   Paper,
   LinearProgress,
-  Divider,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import StorageIcon from '@mui/icons-material/Storage';
@@ -77,8 +76,11 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
   const probe = device.probe || {};
   const selected = driveJobs.find((j) => j.id === (initialJobId || selectedId)) || driveJobs[0] || null;
   const surface =
-    driveJobs.find((j) => j.kind === 'surface_read' && ['running', 'paused'].includes(j.status)) ||
-    driveJobs.find((j) => j.kind === 'surface_read');
+    (selected && ['running', 'paused', 'validating'].includes(selected.status) ? selected : null) ||
+    driveJobs.find((j) => ['running', 'paused', 'validating'].includes(j.status)) ||
+    selected ||
+    driveJobs.find((j) => ['surface_read', 'destructive_verify', 'speed'].includes(j.kind)) ||
+    driveJobs[0];
 
   const assessment = historyAssessment(probe);
   const farm = flattenFARM(probe.farm);
@@ -164,24 +166,24 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
   }
 
   return (
-    <Dialog open fullScreen onClose={onClose}>
+    <Dialog open fullWidth maxWidth="lg" onClose={onClose}>
       <DialogTitle
         id="workspace-title"
         sx={{
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          m: 0,
+          p: 3,
           display: 'flex',
           justify: 'space-between',
           alignItems: 'center',
-          px: 4,
-          py: 2,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <StorageIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
             <Typography variant="caption" color="text.secondary" fontWeight="bold">
-              FULL DRIVE VIEW & WORKSPACE
+              DRIVE WORKSPACE & DIAGNOSTICS
             </Typography>
             <Typography variant="h5" fontWeight="bold" lineHeight={1.1}>
               {probe.model || device.name || device.id}
@@ -194,13 +196,13 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <StatusChip value={device.status} size="medium" />
-          <IconButton aria-label="Close full-screen drive view" onClick={onClose}>
-            <CloseIcon fontSize="large" />
+          <IconButton aria-label="Close drive view modal" onClick={onClose}>
+            <CloseIcon />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 4 }}>
+      <DialogContent dividers sx={{ p: 3 }}>
         <Grid container spacing={3} sx={{ mb: 4 }}>
           {/* Drive Condition Card */}
           <Grid item xs={12} md={6}>
@@ -529,7 +531,7 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
         </Card>
 
         {/* Evidence Timeline Card */}
-        <Card variant="outlined" sx={{ mb: 4 }}>
+        <Card variant="outlined">
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
               <Box>
