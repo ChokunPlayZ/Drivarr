@@ -19,7 +19,6 @@ export const StatusChip: React.FC<StatusChipProps> = ({ value, label, size = 'sm
 
   let color: 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' = 'default';
   let icon = <HourglassEmptyIcon fontSize="small" />;
-  let customStyle = {};
 
   if (['healthy', 'completed', 'passed', 'pass', 'consistent'].includes(status)) {
     color = 'success';
@@ -39,7 +38,6 @@ export const StatusChip: React.FC<StatusChipProps> = ({ value, label, size = 'sm
   } else if (['cancelled', 'interrupted'].includes(status)) {
     color = 'default';
     icon = <CancelOutlinedIcon fontSize="small" />;
-    customStyle = { opacity: 0.7 };
   }
 
   return (
@@ -48,7 +46,6 @@ export const StatusChip: React.FC<StatusChipProps> = ({ value, label, size = 'sm
       color={color}
       icon={icon}
       label={text}
-      sx={customStyle}
       variant="outlined"
       {...props}
     />

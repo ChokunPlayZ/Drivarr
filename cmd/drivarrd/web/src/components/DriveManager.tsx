@@ -1,14 +1,9 @@
 import React from 'react';
 import { Card, CardContent, Box, Typography, Button, LinearProgress, Paper, Divider, Stack } from '@mui/material';
-import StorageIcon from '@mui/icons-material/Storage';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import SpeedIcon from '@mui/icons-material/Speed';
-import ReadMoreIcon from '@mui/icons-material/ReadMore';
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import { Device, Job, Profile, Settings } from '../types';
 import { StatusChip } from './StatusChip';
 import { fmtBytes, fmtDate, statusLabel, smartSelfTestLabel } from '../api';
@@ -61,53 +56,24 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
       (profile.kind !== 'destructive_verify' || settings?.destructiveEnabled)
   );
 
-  const getProfileIcon = (kind: string) => {
-    if (kind.startsWith('smart')) return <CheckCircleIcon color="primary" fontSize="small" />;
-    if (kind === 'speed') return <SpeedIcon color="secondary" fontSize="small" />;
-    if (kind === 'surface_read') return <ReadMoreIcon color="info" fontSize="small" />;
-    return <DeleteForeverIcon color="error" fontSize="small" />;
-  };
-
   const getLatestJob = (profile: Profile) => {
     return driveJobs.find((j) => j.profileId === profile.id) || driveJobs.find((j) => j.kind === profile.kind);
   };
 
   return (
-    <Card
-      sx={{
-        mb: 3,
-        border: device.status === 'quarantined' ? '1px solid rgba(239, 68, 68, 0.4)' : undefined,
-      }}
-    >
+    <Card sx={{ mb: 3 }}>
       <CardContent sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box
-              sx={{
-                width: 52,
-                height: 52,
-                borderRadius: 3,
-                backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'primary.light',
-              }}
-            >
-              <StorageIcon sx={{ fontSize: 32 }} />
-            </Box>
-            <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  {probe.model || device.name || device.id}
-                </Typography>
-                <StatusChip value={device.status} />
-              </Box>
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                {device.path} · {fmtBytes(probe.capacityBytes)} · {probe.deviceInterface || probe.protocol || 'Unknown interface'} · S/N {probe.serial || 'unavailable'}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Typography variant="h5" fontWeight="bold">
+                {probe.model || device.name || device.id}
               </Typography>
+              <StatusChip value={device.status} />
             </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {device.path} · {fmtBytes(probe.capacityBytes)} · {probe.deviceInterface || probe.protocol || 'Unknown interface'} · S/N {probe.serial || 'unavailable'}
+            </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', gap: 1 }}>
@@ -115,13 +81,7 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
               Drive details
             </Button>
             {driveJobs.length > 0 && role !== 'viewer' && (
-              <Button
-                size="small"
-                variant="outlined"
-                color="secondary"
-                startIcon={<PictureAsPdfIcon />}
-                onClick={() => onReport(device.id)}
-              >
+              <Button size="small" variant="outlined" color="secondary" startIcon={<PictureAsPdfIcon />} onClick={() => onReport(device.id)}>
                 PDF report
               </Button>
             )}
@@ -129,8 +89,8 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
         </Box>
 
         {device.reason && (
-          <Paper sx={{ p: 2, mb: 2, backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ color: 'error.light', fontWeight: 600 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="error">
               {device.reason}
             </Typography>
             {device.status === 'quarantined' && role !== 'viewer' && (
@@ -142,20 +102,20 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
         )}
 
         {probe.smartSelfTest && (
-          <Paper sx={{ p: 2, mb: 2.5, backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
             <StatusChip value="running" />
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              <Typography variant="subtitle2" fontWeight="bold">
                 {smartSelfTestLabel(probe.smartSelfTest)}
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              <Typography variant="caption" color="text.secondary">
                 Reported by drive firmware
               </Typography>
             </Box>
           </Paper>
         )}
 
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
           Available Diagnostics ({enabledProfiles.length})
         </Typography>
 
@@ -170,11 +130,9 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
             return (
               <Paper
                 key={profile.id}
+                variant="outlined"
                 sx={{
                   p: 2,
-                  backgroundColor: isDestructive ? 'rgba(239, 68, 68, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-                  border: isDestructive ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 2.5,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -182,18 +140,13 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
                   flexWrap: 'wrap',
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 240, flex: 1 }}>
-                  <Box sx={{ p: 1, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
-                    {getProfileIcon(profile.kind)}
-                  </Box>
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: isDestructive ? 'error.light' : 'text.primary' }}>
-                      {profile.name}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                      {testDescriptions[profile.kind] || statusLabel(profile.kind)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ minWidth: 240, flex: 1 }}>
+                  <Typography variant="subtitle1" fontWeight="bold" color={isDestructive ? 'error' : 'text.primary'}>
+                    {profile.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {testDescriptions[profile.kind] || statusLabel(profile.kind)}
+                  </Typography>
                 </Box>
 
                 <Box sx={{ minWidth: 200, flex: 1 }}>
@@ -201,20 +154,16 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <StatusChip value={job.status} size="small" />
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        <Typography variant="caption" color="text.secondary">
                           {isActive ? `${percent.toFixed(0)}% · ${job.currentPhase || 'In progress'}` : fmtDate(job.finishedAt || job.createdAt)}
                         </Typography>
                       </Box>
                       {isActive && (
-                        <LinearProgress
-                          variant="determinate"
-                          value={percent}
-                          sx={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-                        />
+                        <LinearProgress variant="determinate" value={percent} sx={{ height: 6, borderRadius: 1 }} />
                       )}
                     </Box>
                   ) : (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                    <Typography variant="caption" color="text.secondary" fontStyle="italic">
                       Not run yet
                     </Typography>
                   )}
@@ -222,12 +171,7 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
 
                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                   {job && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<OpenInNewIcon fontSize="small" />}
-                      onClick={() => onOpen(device.id, job.id)}
-                    >
+                    <Button size="small" variant="outlined" startIcon={<OpenInNewIcon fontSize="small" />} onClick={() => onOpen(device.id, job.id)}>
                       View
                     </Button>
                   )}
@@ -253,24 +197,12 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
         {role !== 'viewer' && device.status !== 'quarantined' && probe.smartAvailable && (
           <>
             <Divider sx={{ mb: 2.5 }} />
-            <Paper
-              sx={{
-                p: 2.5,
-                borderRadius: 3,
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                display: 'flex',
-                justify: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: 2,
-              }}
-            >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.light' }}>
+                <Typography variant="subtitle1" fontWeight="bold">
                   Want the full check?
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body2" color="text.secondary">
                   Speed, full surface scan, then extended SMART—run in order.
                 </Typography>
               </Box>
@@ -278,18 +210,13 @@ export const DriveManager: React.FC<DriveManagerProps> = ({
               <Button
                 variant="contained"
                 color="primary"
-                size="large"
                 disabled={activeCount > 0}
                 startIcon={<PlayArrowIcon />}
                 onClick={() => onRun(device, 'preset:complete-drive-check')}
-                sx={{
-                  boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4)',
-                  fontWeight: 700,
-                }}
               >
                 Run complete check
               </Button>
-            </Paper>
+            </Box>
           </>
         )}
       </CardContent>
