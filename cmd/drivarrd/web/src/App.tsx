@@ -8,14 +8,14 @@ import {
   Alert,
   CircularProgress,
   Paper,
+  Chip,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import StorageIcon from '@mui/icons-material/Storage';
 import { User, AppData, NoticeState, Device } from './types';
 import { request, routeDevice, deviceURL, reportDownloadURL } from './api';
-import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
 import { Login } from './components/Login';
-import { DriveManager } from './components/DriveManager';
+import { DriveListView } from './components/DriveListView';
 import { DriveWorkspace } from './components/DriveWorkspace';
 import { TestDialog } from './components/TestDialog';
 import { ReportsTable } from './components/ReportsTable';
@@ -235,7 +235,7 @@ export const App: React.FC = () => {
         }}
       >
         <CircularProgress size={48} color="primary" />
-        <Typography variant="body1" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+        <Typography variant="body1" color="text.secondary">
           Loading Drivarr...
         </Typography>
       </Box>
@@ -250,8 +250,8 @@ export const App: React.FC = () => {
   const workspaceDevice = data.devices.find((d) => d.id === workspaceId);
 
   return (
-    <Box sx={{ minHeight: '100vh', pb: 8 }}>
-      <Navbar
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      <Sidebar
         user={user}
         deviceCount={data.devices.length}
         connected={connected}
@@ -260,46 +260,34 @@ export const App: React.FC = () => {
         onLogout={logout}
       />
 
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: 4, width: 'calc(100% - 240px)' }}>
         {page === 'drives' && (
           <Box>
             <Box
               sx={{
                 display: 'flex',
-                justify: 'space-between',
                 alignItems: 'center',
-                mb: 4,
-                flexWrap: 'wrap',
+                mb: 3,
                 gap: 2,
+                width: '100%',
               }}
             >
               <Box>
-                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  HARDWARE DIAGNOSTICS
+                <Typography variant="h5" fontWeight="bold">
+                  Physical Drives
                 </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                  Connected Physical Drives
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                  Select a test below. Every test available for each drive is shown with its latest result.
+                <Typography variant="body2" color="text.secondary">
+                  Click on any drive to view actions or details.
                 </Typography>
               </Box>
 
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', ml: 'auto' }}>
                 {activeJobCount > 0 && (
-                  <Paper
-                    sx={{
-                      px: 2,
-                      py: 1,
-                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: 3,
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.light' }}>
-                      {activeJobCount} test{activeJobCount === 1 ? '' : 's'} running
-                    </Typography>
-                  </Paper>
+                  <Chip
+                    label={`${activeJobCount} active test${activeJobCount === 1 ? '' : 's'}`}
+                    color="primary"
+                    variant="outlined"
+                  />
                 )}
 
                 <Button
@@ -317,45 +305,22 @@ export const App: React.FC = () => {
               </Box>
             </Box>
 
-            {data.devices.length ? (
-              data.devices.map((device) => (
-                <DriveManager
-                  key={device.id}
-                  device={device}
-                  jobs={data.jobs}
-                  profiles={data.profiles}
-                  settings={data.settings}
-                  role={user.role}
-                  onOpen={openWorkspace}
-                  onRun={(selected, profileId) => setTestDevice({ device: selected, profileId })}
-                  onAction={jobAction}
-                  onReport={driveReport}
-                  onRetry={(id) =>
-                    mutate(`/api/v1/devices/${encodeURIComponent(id)}/retry`, { method: 'POST' }, 'Manual probe scheduled')
-                  }
-                />
-              ))
-            ) : (
-              <Paper
-                sx={{
-                  p: 8,
-                  textAlign: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px dashed rgba(255, 255, 255, 0.1)',
-                  borderRadius: 4,
-                }}
-              >
-                <StorageIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.4 }} />
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  No drives found
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-                  Connect a drive, then refresh discovery.
-                </Typography>
-              </Paper>
-            )}
+            <DriveListView
+              devices={data.devices}
+              jobs={data.jobs}
+              profiles={data.profiles}
+              settings={data.settings}
+              role={user.role}
+              onOpen={openWorkspace}
+              onRun={(selected, profileId) => setTestDevice({ device: selected, profileId })}
+              onAction={jobAction}
+              onReport={driveReport}
+              onRetry={(id) =>
+                mutate(`/api/v1/devices/${encodeURIComponent(id)}/retry`, { method: 'POST' }, 'Manual probe scheduled')
+              }
+            />
 
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 2, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
               {updated ? `Last checked ${updated.toLocaleTimeString()}` : 'Checking for drives...'}
             </Typography>
           </Box>
@@ -363,14 +328,9 @@ export const App: React.FC = () => {
 
         {page === 'reports' && (
           <Box>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
-                TAMPER-EVIDENT EVIDENCE
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                Generated PDF Reports
-              </Typography>
-            </Box>
+            <Typography variant="h5" fontWeight="bold" sx={{ mb: 3 }}>
+              PDF Reports
+            </Typography>
 
             <ReportsTable
               reports={data.reports}
@@ -468,7 +428,7 @@ export const App: React.FC = () => {
             }}
           />
         )}
-      </Container>
+      </Box>
 
       {testDevice && (
         <TestDialog
@@ -510,7 +470,7 @@ export const App: React.FC = () => {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         {notice ? (
-          <Alert onClose={() => setNotice(null)} severity={notice.error ? 'error' : 'success'} sx={{ width: '100%', borderRadius: 3 }}>
+          <Alert onClose={() => setNotice(null)} severity={notice.error ? 'error' : 'success'} sx={{ width: '100%' }}>
             {notice.message}
           </Alert>
         ) : undefined}
