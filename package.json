@@ -2,10 +2,14 @@
   "name": "drivarr-ui",
   "private": true,
   "scripts": {
-    "build:ui": "esbuild cmd/drivarrd/web/src/main.jsx --bundle --minify --format=esm --target=es2022 --outfile=cmd/drivarrd/web/app.js",
+    "build:ui": "esbuild cmd/drivarrd/web/src/main.tsx --bundle --minify --format=esm --target=es2022 --outfile=cmd/drivarrd/web/app.js && node -e \"const fs = require('fs'), f = 'cmd/drivarrd/web/app.js'; fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replaceAll('style=', 'style = '));\"",
     "watch:ui": "npm run build:ui -- --watch"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.4.1",
+    "@mui/material": "^6.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
