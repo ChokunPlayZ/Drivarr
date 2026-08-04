@@ -5,5 +5,9 @@
 *.test
 node_modules/
 
+# Generated web bundles
+cmd/drivarrd/web/app.js
+demo/app.js
+
 .DS_Store
 tmp/
