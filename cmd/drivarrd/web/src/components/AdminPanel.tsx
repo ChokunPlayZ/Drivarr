@@ -1,4 +1,32 @@
 import React from 'react';
+import {
+  Grid,
+  Card,
+  CardContent,
+  Typography,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Box,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Paper,
+  Divider,
+  Chip,
+} from '@mui/material';
+import SaveIcon from '@mui/icons-material/Save';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import LockResetIcon from '@mui/icons-material/LockReset';
+import AddCircleOutlinedIcon from '@mui/icons-material/AddCircleOutlined';
+import PolicyIcon from '@mui/icons-material/Policy';
 import { Settings, User, AuditEvent } from '../types';
 import { fmtDate } from '../api';
 
@@ -11,30 +39,6 @@ interface AdminPanelProps {
   onPassword: (form: HTMLFormElement) => Promise<void>;
   onProfile: (form: HTMLFormElement) => Promise<void>;
   onPolicy: (form: HTMLFormElement) => Promise<void>;
-}
-
-function NumberField({ label, name, min, max, value }: { label: string; name: string; min: string; max?: string; value: any }) {
-  return (
-    <label>
-      {label}
-      <input name={name} type="number" min={min} max={max} defaultValue={value} />
-    </label>
-  );
-}
-
-function ResetForm({ onSubmit, children, className }: { onSubmit: (form: HTMLFormElement) => Promise<void>; children: React.ReactNode; className: string }) {
-  return (
-    <form
-      className={className}
-      onSubmit={async (e) => {
-        e.preventDefault();
-        await onSubmit(e.currentTarget);
-        e.currentTarget.reset();
-      }}
-    >
-      {children}
-    </form>
-  );
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -50,165 +54,245 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   if (!settings) return null;
 
   return (
-    <>
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">System</p>
-          <h2>Administration</h2>
-        </div>
-      </div>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Box>
+        <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+          SYSTEM CONTROL
+        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 800 }}>
+          Administration & Policy Configuration
+        </Typography>
+      </Box>
 
-      <div className="admin-grid">
-        <form
-          className="panel"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSettings(e.currentTarget);
-          }}
-        >
-          <h3>Testing policy</h3>
-          <label>
-            Organization
-            <input name="organization" required defaultValue={settings.organization} />
-          </label>
-          <NumberField label="Concurrent jobs" name="maxConcurrentJobs" min="1" max="32" value={settings.maxConcurrentJobs} />
-          <NumberField label="Destructive concurrency" name="maxDestructiveJobs" min="1" max="32" value={settings.maxDestructiveJobs} />
-          <NumberField label="Chunk size (MiB)" name="jobChunkMiB" min="16" max="4096" value={settings.jobChunkMiB} />
-          <NumberField label="Report retention days (0 = forever)" name="retentionDays" min="0" value={settings.retentionDays} />
-          <NumberField label="Report storage limit in bytes (0 = unlimited)" name="retentionMaxBytes" min="0" value={settings.retentionMaxBytes} />
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%', p: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SaveIcon color="primary" /> Testing Policy & Engine Limits
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await onSettings(e.currentTarget);
+                }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+              >
+                <TextField label="Organization Name" name="organization" required defaultValue={settings.organization} size="small" fullWidth />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField label="Max Concurrent Jobs" name="maxConcurrentJobs" type="number" required defaultValue={settings.maxConcurrentJobs} slotProps={{ htmlInput: { min: 1, max: 32 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Max Destructive Jobs" name="maxDestructiveJobs" type="number" required defaultValue={settings.maxDestructiveJobs} slotProps={{ htmlInput: { min: 1, max: 32 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Chunk Size (MiB)" name="jobChunkMiB" type="number" required defaultValue={settings.jobChunkMiB} slotProps={{ htmlInput: { min: 16, max: 4096 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Report Retention (Days)" name="retentionDays" type="number" required defaultValue={settings.retentionDays} slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField label="Report Storage Limit Bytes (0=unlimited)" name="retentionMaxBytes" type="number" required defaultValue={settings.retentionMaxBytes} slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                  </Grid>
+                </Grid>
+                <FormControlLabel
+                  control={<Checkbox name="destructiveEnabled" defaultChecked={settings.destructiveEnabled} color="error" />}
+                  label="Enable destructive verification workloads"
+                />
+                <Button type="submit" variant="contained" color="primary" startIcon={<SaveIcon />}>
+                  Save Settings
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-          <label className="check">
-            <input name="destructiveEnabled" type="checkbox" defaultChecked={settings.destructiveEnabled} />
-            Enable destructive verification
-          </label>
+        <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%', p: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PersonAddIcon color="secondary" /> Account Management
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  await onUser(form);
+                  form.reset();
+                }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+              >
+                <TextField label="Username" name="username" required slotProps={{ htmlInput: { minLength: 3 } }} size="small" fullWidth />
+                <TextField label="Temporary Password" name="password" type="password" required slotProps={{ htmlInput: { minLength: 12 } }} size="small" fullWidth />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="role-label">Role</InputLabel>
+                  <Select labelId="role-label" name="role" defaultValue="viewer" label="Role">
+                    <MenuItem value="viewer">Viewer</MenuItem>
+                    <MenuItem value="operator">Operator</MenuItem>
+                    <MenuItem value="admin">Administrator</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button type="submit" variant="contained" color="secondary" startIcon={<PersonAddIcon />}>
+                  Create User Account
+                </Button>
+              </Box>
 
-          <button className="filled" type="submit">
-            Save settings
-          </button>
-        </form>
+              <Divider sx={{ my: 2.5 }} />
 
-        <ResetForm className="panel" onSubmit={onUser}>
-          <h3>Add user</h3>
-          <label>
-            Username
-            <input name="username" minLength={3} required />
-          </label>
-          <label>
-            Temporary password
-            <input name="password" type="password" minLength={12} required />
-          </label>
-          <label>
-            Role
-            <select name="role" defaultValue="viewer">
-              <option value="viewer">Viewer</option>
-              <option value="operator">Operator</option>
-              <option value="admin">Administrator</option>
-            </select>
-          </label>
-          <button className="filled" type="submit">
-            Create user
-          </button>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: 'text.secondary' }}>
+                Existing System Users ({users.length})
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: 160, overflowY: 'auto' }}>
+                {users.map((u) => (
+                  <Paper key={u.id || u.username} sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {u.username}
+                    </Typography>
+                    <Chip size="small" label={u.role} color={u.role === 'admin' ? 'primary' : u.role === 'operator' ? 'secondary' : 'default'} variant="outlined" />
+                  </Paper>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-          <div>
-            {users.map((u) => (
-              <div className="user-row" key={u.id || u.username}>
-                <span>{u.username}</span>
-                <small>{u.role}</small>
-              </div>
-            ))}
-          </div>
-        </ResetForm>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', p: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LockResetIcon color="warning" /> Security & Password
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  await onPassword(form);
+                  form.reset();
+                }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+              >
+                <TextField label="Current Password" name="currentPassword" type="password" required size="small" fullWidth />
+                <TextField label="New Password (min 12 chars)" name="newPassword" type="password" required slotProps={{ htmlInput: { minLength: 12 } }} size="small" fullWidth />
+                <Button type="submit" variant="outlined" color="warning" startIcon={<LockResetIcon />}>
+                  Change Password
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-        <ResetForm className="panel" onSubmit={onPassword}>
-          <h3>Change my password</h3>
-          <label>
-            Current password
-            <input name="currentPassword" type="password" required />
-          </label>
-          <label>
-            New password
-            <input name="newPassword" type="password" minLength={12} required />
-          </label>
-          <button className="filled" type="submit">
-            Change password
-          </button>
-        </ResetForm>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', p: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AddCircleOutlinedIcon color="info" /> Custom Test Profile
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  await onProfile(form);
+                  form.reset();
+                }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+              >
+                <TextField label="Profile Name" name="name" required size="small" fullWidth />
+                <FormControl size="small" fullWidth>
+                  <InputLabel id="kind-label">Test Type</InputLabel>
+                  <Select labelId="kind-label" name="kind" defaultValue="speed" label="Test Type">
+                    <MenuItem value="speed">Speed Test</MenuItem>
+                    <MenuItem value="surface_read">Surface Read</MenuItem>
+                    <MenuItem value="destructive_verify">Destructive Verification</MenuItem>
+                  </Select>
+                </FormControl>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={6}>
+                    <TextField label="Block Size (KiB)" name="blockSizeKiB" type="number" defaultValue="1024" slotProps={{ htmlInput: { min: 4, max: 16384 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Queue Depth" name="queueDepth" type="number" defaultValue="1" slotProps={{ htmlInput: { min: 1, max: 128 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Duration (sec)" name="durationSeconds" type="number" defaultValue="15" slotProps={{ htmlInput: { min: 0, max: 86400 } }} size="small" fullWidth />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField label="Rate Limit (MiB/s)" name="rateMiB" type="number" defaultValue="0" slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                  </Grid>
+                </Grid>
+                <Button type="submit" variant="outlined" color="info" startIcon={<AddCircleOutlinedIcon />}>
+                  Create Profile
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
 
-        <ResetForm className="panel" onSubmit={onProfile}>
-          <h3>Create advanced test profile</h3>
-          <label>
-            Name
-            <input name="name" required />
-          </label>
-          <label>
-            Test type
-            <select name="kind" defaultValue="speed">
-              <option value="speed">Speed test</option>
-              <option value="surface_read">Surface read</option>
-              <option value="destructive_verify">Destructive verification</option>
-            </select>
-          </label>
-          <NumberField label="Block size (KiB)" name="blockSizeKiB" min="4" max="16384" value="1024" />
-          <NumberField label="Queue depth" name="queueDepth" min="1" max="128" value="1" />
-          <NumberField label="Duration seconds" name="durationSeconds" min="0" max="86400" value="15" />
-          <NumberField label="Rate limit MiB/s (0 = unlimited)" name="rateMiB" min="0" value="0" />
-          <button className="filled" type="submit">
-            Create profile
-          </button>
-        </ResetForm>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ height: '100%', p: 1 }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <PolicyIcon color="success" /> Custom Grading Policy
+              </Typography>
+              <Box
+                component="form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  await onPolicy(form);
+                  form.reset();
+                }}
+                sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}
+              >
+                <TextField label="Policy Name" name="name" required size="small" fullWidth />
+                <FormControlLabel control={<Checkbox name="failOnSmart" defaultChecked color="success" />} label="Fail on SMART failure" />
+                <FormControlLabel control={<Checkbox name="failOnIoError" defaultChecked color="success" />} label="Fail on I/O error" />
+                <TextField label="Warn Pending Sectors Above" name="warnPendingAbove" type="number" defaultValue="0" slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                <TextField label="Warn Reallocated Above" name="warnReallocatedAbove" type="number" defaultValue="0" slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                <TextField label="Warn Uncorrectable Above" name="warnUncorrectableAbove" type="number" defaultValue="0" slotProps={{ htmlInput: { min: 0 } }} size="small" fullWidth />
+                <Button type="submit" variant="outlined" color="success" startIcon={<PolicyIcon />}>
+                  Create Policy
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-        <ResetForm className="panel" onSubmit={onPolicy}>
-          <h3>Create grading policy</h3>
-          <label>
-            Name
-            <input name="name" required />
-          </label>
-          <label className="check">
-            <input name="failOnSmart" type="checkbox" defaultChecked />
-            Fail on SMART health failure
-          </label>
-          <label className="check">
-            <input name="failOnIoError" type="checkbox" defaultChecked />
-            Fail on scan I/O error
-          </label>
-          <NumberField label="Warn when pending sectors exceed" name="warnPendingAbove" min="0" value="0" />
-          <NumberField label="Warn when reallocated sectors exceed" name="warnReallocatedAbove" min="0" value="0" />
-          <NumberField label="Warn when uncorrectable sectors exceed" name="warnUncorrectableAbove" min="0" value="0" />
-          <button className="filled" type="submit">
-            Create policy
-          </button>
-        </ResetForm>
-      </div>
-
-      <div className="section-heading">
-        <div>
-          <p className="eyebrow">Accountability</p>
-          <h2>Audit log</h2>
-        </div>
-      </div>
-
-      <div className="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Action</th>
-              <th>User</th>
-              <th>Target</th>
-            </tr>
-          </thead>
-          <tbody>
-            {audit.map((event, index) => (
-              <tr key={`${event.at}-${event.action}-${index}`}>
-                <td>{fmtDate(event.at)}</td>
-                <td>{event.action}</td>
-                <td>{event.userId || 'system'}</td>
-                <td>{event.target || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+          ACCOUNTABILITY & TRACEABILITY
+        </Typography>
+        <Typography variant="h5" sx={{ fontWeight: 800, mb: 2 }}>
+          System Audit Log
+        </Typography>
+        <Paper sx={{ overflowX: 'auto', borderRadius: 3 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Timestamp</TableCell>
+                <TableCell>Action Executed</TableCell>
+                <TableCell>User Account</TableCell>
+                <TableCell>Target Resource</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {audit.map((event, index) => (
+                <TableRow key={`${event.at}-${event.action}-${index}`} hover>
+                  <TableCell>{fmtDate(event.at)}</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'primary.light' }}>{event.action}</TableCell>
+                  <TableCell>{event.userId || 'system'}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace' }}>{event.target || '—'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      </Box>
+    </Box>
   );
 };

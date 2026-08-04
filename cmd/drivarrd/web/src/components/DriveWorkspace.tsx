@@ -1,4 +1,34 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  Button,
+  Chip,
+  Paper,
+  LinearProgress,
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import StorageIcon from '@mui/icons-material/Storage';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningIcon from '@mui/icons-material/Warning';
+import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import { Device, Job } from '../types';
 import { StatusChip } from './StatusChip';
 import { JobActions } from './JobActions';
@@ -15,21 +45,6 @@ interface DriveWorkspaceProps {
   onReport: (id: string) => void;
 }
 
-function DataSection({ eyebrow, title, meta, children }: { eyebrow: string; title: string; meta: string; children: React.ReactNode }) {
-  return (
-    <section className="workspace-section">
-      <div className="workspace-section-head">
-        <div>
-          <p className="eyebrow">{eyebrow}</p>
-          <h3>{title}</h3>
-        </div>
-        <span>{meta}</span>
-      </div>
-      <div className="table-card">{children}</div>
-    </section>
-  );
-}
-
 export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
   device,
   jobs,
@@ -39,36 +54,30 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
   onAction,
   onReport,
 }) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const driveJobs = useMemo(() => jobs.filter((job) => job.deviceId === device.id), [jobs, device.id]);
+  const driveJobs = useMemo(() => jobs.filter((j) => j.deviceId === device.id), [jobs, device.id]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     const preferred =
-      driveJobs.find((job) => job.id === initialJobId)?.id ||
-      driveJobs.find((job) => ['running', 'paused', 'validating'].includes(job.status))?.id ||
+      driveJobs.find((j) => j.id === initialJobId)?.id ||
+      driveJobs.find((j) => ['running', 'paused', 'validating'].includes(j.status))?.id ||
       driveJobs[0]?.id ||
       null;
 
     setSelectedId((current) =>
-      driveJobs.some((job) => job.id === initialJobId)
+      driveJobs.some((j) => j.id === initialJobId)
         ? initialJobId!
-        : driveJobs.some((job) => job.id === current)
+        : driveJobs.some((j) => j.id === current)
         ? current
         : preferred
     );
   }, [driveJobs, initialJobId]);
 
-  useEffect(() => {
-    dialogRef.current?.showModal();
-    return () => dialogRef.current?.close();
-  }, []);
-
   const probe = device.probe || {};
-  const selected = driveJobs.find((job) => job.id === (initialJobId || selectedId)) || driveJobs[0] || null;
+  const selected = driveJobs.find((j) => j.id === (initialJobId || selectedId)) || driveJobs[0] || null;
   const surface =
-    driveJobs.find((job) => job.kind === 'surface_read' && ['running', 'paused'].includes(job.status)) ||
-    driveJobs.find((job) => job.kind === 'surface_read');
+    driveJobs.find((j) => j.kind === 'surface_read' && ['running', 'paused'].includes(j.status)) ||
+    driveJobs.find((j) => j.kind === 'surface_read');
 
   const assessment = historyAssessment(probe);
   const farm = flattenFARM(probe.farm);
@@ -76,339 +85,530 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
 
   if (initialJobId && selected) {
     return (
-      <dialog ref={dialogRef} className="test-detail-dialog" aria-labelledby="test-detail-title" onClose={onClose}>
-        <div className="test-detail-head">
-          <div>
-            <p className="eyebrow">Test details</p>
-            <h2 id="test-detail-title">{selected.profileName || statusLabel(selected.kind)}</h2>
-            <p>{probe.model || device.name || device.id} · {device.path}</p>
-          </div>
-          <button className="icon-button" aria-label="Close test details" onClick={onClose}>
-            ×
-          </button>
-        </div>
+      <Dialog open fullWidth maxWidth="md" onClose={onClose}>
+        <DialogTitle sx={{ m: 0, p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+              TEST DETAILS
+            </Typography>
+            <Typography id="test-detail-title" variant="h5" sx={{ fontWeight: 800 }}>
+              {selected.profileName || statusLabel(selected.kind)}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {probe.model || device.name || device.id} · {device.path}
+            </Typography>
+          </Box>
+          <IconButton aria-label="Close test details" onClick={onClose} sx={{ color: 'text.secondary' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(17, 24, 39, 1) 100%)', borderRadius: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <StatusChip value={selected.status} size="medium" />
+              <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.light' }}>
+                {percent.toFixed(1)}% complete
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+              {selected.currentPhase || selected.error || 'No additional result details'}
+            </Typography>
+            <LinearProgress variant="determinate" value={percent} sx={{ height: 10, borderRadius: 5 }} />
+          </Paper>
 
-        <div className="test-detail-body">
-          <div className="test-result-hero">
-            <div>
-              <StatusChip value={selected.status} />
-              <h3>{percent.toFixed(1)}% complete</h3>
-              <p>{selected.currentPhase || selected.error || 'No additional result details'}</p>
-            </div>
-            <progress
-              className="test-detail-progress"
-              aria-label={`${statusLabel(selected.kind)} progress`}
-              max="100"
-              value={percent}
-            >
-              {percent.toFixed(1)}%
-            </progress>
-          </div>
-
-          <div className="test-detail-grid">
+          <Grid container spacing={2} sx={{ mb: 3 }}>
             {[
               ['Started', fmtDate(selected.startedAt || selected.createdAt)],
               ['Finished', fmtDate(selected.finishedAt)],
-              ['Data checked', `${fmtBytes(selected.completedBytes)} / ${fmtBytes(selected.totalBytes)}`],
-              ['Read speed', fmtSpeed(selected.readBps)],
-              ['Random read', selected.readIops ? `${selected.readIops.toFixed(1)} IOPS` : '—'],
+              ['Data Checked', `${fmtBytes(selected.completedBytes)} / ${fmtBytes(selected.totalBytes)}`],
+              ['Read Speed', fmtSpeed(selected.readBps)],
+              ['Random Read', selected.readIops ? `${selected.readIops.toFixed(1)} IOPS` : '—'],
               ['Errors', String(selected.errors?.length || 0)],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
+            ].map(([label, val]) => (
+              <Grid item xs={6} sm={4} key={label}>
+                <Paper sx={{ p: 2, backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                    {label}
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5 }}>
+                    {val}
+                  </Typography>
+                </Paper>
+              </Grid>
             ))}
-          </div>
+          </Grid>
 
-          {selected.error && <p className="test-error">{selected.error}</p>}
+          {selected.error && (
+            <Paper sx={{ p: 2, mb: 3, backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'error.light', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {selected.error}
+              </Typography>
+            </Paper>
+          )}
 
-          <JobActions job={selected} role={role} onAction={onAction} verbose />
+          <Box sx={{ mb: 3 }}>
+            <JobActions job={selected} role={role} onAction={onAction} verbose />
+          </Box>
 
           {selected.kind === 'surface_read' && (
-            <section className="test-map">
-              <div>
-                <p className="eyebrow">Media result</p>
-                <h3>Sector map</h3>
-              </div>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+                Sector Map
+              </Typography>
               <SurfaceMap job={selected} />
-            </section>
+            </Box>
           )}
-        </div>
-      </dialog>
+        </DialogContent>
+      </Dialog>
     );
   }
 
   return (
-    <dialog ref={dialogRef} className="drive-workspace" aria-labelledby="workspace-title" onClose={onClose}>
-      <div className="workspace-bar">
-        <div>
-          <p className="eyebrow">Live drive workspace</p>
-          <h2 id="workspace-title">{probe.model || device.name || device.id}</h2>
-          <p className="workspace-path">
-            {device.path} · {probe.protocol || 'unknown protocol'} · {fmtBytes(probe.capacityBytes)}
-          </p>
-        </div>
-        <div className="workspace-bar-actions">
-          <StatusChip value={device.status} />
-          <button className="icon-button" aria-label="Close full-screen drive view" onClick={onClose}>
-            ×
-          </button>
-        </div>
-      </div>
+    <Dialog open fullScreen onClose={onClose}>
+      <DialogTitle
+        id="workspace-title"
+        sx={{
+          backgroundColor: '#111827',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          justify: 'space-between',
+          alignItems: 'center',
+          px: 4,
+          py: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, #6366F1 0%, #06B6D4 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFF',
+            }}
+          >
+            <StorageIcon />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+              LIVE DRIVE WORKSPACE
+            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+              {probe.model || device.name || device.id}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {device.path} · {probe.protocol || 'unknown protocol'} · {fmtBytes(probe.capacityBytes)}
+            </Typography>
+          </Box>
+        </Box>
 
-      <div className="workspace-content">
-        <div className="workspace-hero">
-          <section className="workspace-panel">
-            <p className="eyebrow">Drive condition</p>
-            <h3>{probe.model || device.name || device.id}</h3>
-            <p className="supporting">
-              Serial {probe.serial || 'unavailable'} · firmware {probe.firmware || 'unavailable'} · collected {fmtDate(probe.collectedAt)}
-            </p>
-            <div className="workspace-overview">
-              {[
-                ['SMART health', probe.smartAvailable ? (probe.smartPassed ? 'Passed' : 'Failed') : 'Unavailable'],
-                ['Drive interface', probe.deviceInterface || '—'],
-                ['Recording type', probe.recordingType || '—'],
-                ['Temperature', probe.temperatureC ? `${probe.temperatureC} °C` : '—'],
-                ['Power-on hours', probe.powerOnHours ? probe.powerOnHours.toLocaleString() : '—'],
-                ['Pending sectors', probe.pendingSectors !== undefined ? String(probe.pendingSectors) : '—'],
-                ['Reallocated', probe.reallocatedSectors !== undefined ? String(probe.reallocatedSectors) : '—'],
-                ['Uncorrectable', probe.uncorrectableSectors !== undefined ? String(probe.uncorrectableSectors) : '—'],
-              ].map(([label, value]) => (
-                <div className="fact" key={label}>
-                  <span>{label}</span>
-                  <strong className={label === 'SMART health' && probe.smartPassed === false ? 'bad' : ''}>
-                    {value}
-                  </strong>
-                </div>
-              ))}
-            </div>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <StatusChip value={device.status} size="medium" />
+          <IconButton aria-label="Close full-screen drive view" onClick={onClose} sx={{ color: 'text.secondary' }}>
+            <CloseIcon fontSize="large" />
+          </IconButton>
+        </Box>
+      </DialogTitle>
 
-            {probe.smartSelfTest && (
-              <div className="smart-test-banner workspace-smart-test">
-                <StatusChip value="running" />
-                <div>
-                  <strong>{smartSelfTestLabel(probe.smartSelfTest)}</strong>
-                  <small>{probe.smartSelfTest.status || 'Detected from drive firmware'}</small>
-                </div>
-              </div>
-            )}
-          </section>
+      <DialogContent sx={{ backgroundColor: '#0B0F19', p: 4 }}>
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%', p: 1 }}>
+              <CardContent>
+                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  DRIVE CONDITION
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
+                  {probe.model || device.name || device.id}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
+                  Serial {probe.serial || 'unavailable'} · Firmware {probe.firmware || 'unavailable'} · Collected {fmtDate(probe.collectedAt)}
+                </Typography>
 
-          <section className="workspace-panel">
-            <div className="workspace-section-head">
-              <div>
-                <p className="eyebrow">Live progress</p>
-                <h3>Selected test</h3>
-              </div>
-              {driveJobs.length > 1 && (
-                <label className="job-selector">
-                  View test
-                  <select value={selected?.id || ''} onChange={(e) => setSelectedId(e.target.value)}>
-                    {driveJobs.map((job) => (
-                      <option key={job.id} value={job.id}>
-                        {job.id} · {statusLabel(job.status)} · {statusLabel(job.kind)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
+                <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                  {[
+                    ['SMART Health', probe.smartAvailable ? (probe.smartPassed ? 'Passed' : 'Failed') : 'Unavailable'],
+                    ['Drive Interface', probe.deviceInterface || '—'],
+                    ['Recording Type', probe.recordingType || '—'],
+                    ['Temperature', probe.temperatureC ? `${probe.temperatureC} °C` : '—'],
+                    ['Power-on Hours', probe.powerOnHours ? probe.powerOnHours.toLocaleString() : '—'],
+                    ['Pending Sectors', probe.pendingSectors !== undefined ? String(probe.pendingSectors) : '—'],
+                    ['Reallocated', probe.reallocatedSectors !== undefined ? String(probe.reallocatedSectors) : '—'],
+                    ['Uncorrectable', probe.uncorrectableSectors !== undefined ? String(probe.uncorrectableSectors) : '—'],
+                  ].map(([label, val]) => (
+                    <Grid item xs={6} key={label}>
+                      <Paper sx={{ p: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                          {label}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 700,
+                            color: label === 'SMART Health' && probe.smartPassed === false ? 'error.main' : 'text.primary',
+                          }}
+                        >
+                          {val}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
 
-            {selected ? (
-              <div className="live-progress">
-                <div className="progress-ring">
-                  <strong>{percent.toFixed(1)}%</strong>
-                  <span>complete</span>
-                  <progress
-                    className="detail-progress"
-                    aria-label={`${statusLabel(selected.kind)} progress`}
-                    max="100"
-                    value={percent}
-                  >
-                    {percent.toFixed(1)}%
-                  </progress>
-                </div>
-
-                <div>
-                  <StatusChip value={selected.status} />
-                  <h3>{selected.profileName || statusLabel(selected.kind)}</h3>
-                  <p className="supporting">{selected.currentPhase || selected.error || 'Waiting for worker update'}</p>
-
-                  <div className="job-detail-list">
-                    <div className="job-detail">
-                      <span>Checked</span>
-                      <strong>{fmtBytes(selected.completedBytes)} / {fmtBytes(selected.totalBytes)}</strong>
-                    </div>
-                    <div className="job-detail">
-                      <span>Performance</span>
-                      <strong>{fmtSpeed(selected.readBps)}</strong>
-                    </div>
-                    <div className="job-detail">
-                      <span>Sector errors</span>
-                      <strong>{selected.errors?.length || 0}</strong>
-                    </div>
-                  </div>
-
-                  <JobActions job={selected} role={role} onAction={onAction} verbose />
-                </div>
-              </div>
-            ) : (
-              <div className="workspace-empty">No test is associated with this drive.</div>
-            )}
-          </section>
-        </div>
-
-        <section className="workspace-panel workspace-section">
-          <div className="workspace-section-head">
-            <div>
-              <p className="eyebrow">Real-time media view</p>
-              <h3>Full sector map</h3>
-            </div>
-            <span>Mapped from durable byte checkpoints and sector errors</span>
-          </div>
-          <SurfaceMap job={surface} />
-        </section>
-
-        <section className={`workspace-section integrity-card ${assessment.kind}`}>
-          <h3>{assessment.label}</h3>
-          {assessment.evidence.map((item) => (
-            <p key={item}>• {item}</p>
-          ))}
-          <p>
-            <strong>Heuristic only:</strong> conflicting counters can indicate a reset but do not prove intentional wiping.
-          </p>
-        </section>
-
-        <DataSection
-          eyebrow="Complete device log"
-          title="SMART attribute table"
-          meta={`${probe.smartAttributes?.length || 0} attributes · updated ${fmtDate(probe.collectedAt)}`}
-        >
-          <table className="smart-full-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Attribute</th>
-                <th>Current</th>
-                <th>Worst</th>
-                <th>Threshold</th>
-                <th>Raw value</th>
-                <th>Failed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {probe.smartAttributes?.length ? (
-                probe.smartAttributes.map((attribute) => (
-                  <tr key={attribute.id}>
-                    <td>{attribute.id}</td>
-                    <td>{attribute.name}</td>
-                    <td>{attribute.current}</td>
-                    <td>{attribute.worst}</td>
-                    <td>{attribute.threshold}</td>
-                    <td>{attribute.rawString || attribute.rawValue}</td>
-                    <td>{attribute.whenFailed || '—'}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7}>The current device snapshot does not include SMART attributes.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </DataSection>
-
-        <DataSection
-          eyebrow="Complete device log"
-          title="Seagate FARM table"
-          meta={`${farm.length} scalar metrics`}
-        >
-          <table className="farm-table">
-            <thead>
-              <tr>
-                <th>Metric path</th>
-                <th>Value</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {farm.length ? (
-                farm.map(([metric, value]) => (
-                  <tr key={metric}>
-                    <td>{metric.replaceAll('.', ' › ')}</td>
-                    <td>{value}</td>
-                    <td>
-                      <span className="source-chip">FARM log</span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={3}>
-                    {probe.farmAvailable
-                      ? 'The FARM log was returned without displayable scalar fields.'
-                      : 'FARM is unavailable for this device.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </DataSection>
-
-        <section className="workspace-section">
-          <div className="workspace-section-head">
-            <div>
-              <p className="eyebrow">Evidence timeline</p>
-              <h3>All tests for this drive</h3>
-            </div>
-            <div className="actions">
-              {driveJobs.length > 0 && role !== 'viewer' && (
-                <button className="filled" onClick={() => onReport(device.id)}>
-                  Generate full PDF ({driveJobs.length} tests)
-                </button>
-              )}
-              <span>{driveJobs.length} retained job{driveJobs.length === 1 ? '' : 's'}</span>
-            </div>
-          </div>
-
-          <div className="table-card">
-            <table>
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>Test</th>
-                  <th>Status</th>
-                  <th>Progress</th>
-                  <th>Phase</th>
-                  <th>Performance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {driveJobs.length ? (
-                  driveJobs.map((job) => (
-                    <tr key={job.id}>
-                      <td>{job.id}</td>
-                      <td>{statusLabel(job.kind)}</td>
-                      <td>
-                        <StatusChip value={job.status} />
-                      </td>
-                      <td>{((job.progress || 0) * 100).toFixed(1)}%</td>
-                      <td>{job.currentPhase || job.error || '—'}</td>
-                      <td>{fmtSpeed(job.readBps)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6}>No tests have been run on this drive.</td>
-                  </tr>
+                {probe.smartSelfTest && (
+                  <Paper sx={{ p: 2, backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <StatusChip value="running" size="small" />
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {smartSelfTestLabel(probe.smartSelfTest)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          {probe.smartSelfTest.status || 'Detected from drive firmware'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Paper>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-    </dialog>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%', p: 1 }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                      LIVE PROGRESS
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                      Selected Test
+                    </Typography>
+                  </Box>
+
+                  {driveJobs.length > 1 && (
+                    <FormControl size="small" sx={{ minWidth: 200 }}>
+                      <InputLabel id="job-select-label">Select test</InputLabel>
+                      <Select
+                        labelId="job-select-label"
+                        value={selected?.id || ''}
+                        label="Select test"
+                        onChange={(e) => setSelectedId(e.target.value)}
+                      >
+                        {driveJobs.map((j) => (
+                          <MenuItem key={j.id} value={j.id}>
+                            {j.id} · {statusLabel(j.status)} · {statusLabel(j.kind)}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+                </Box>
+
+                {selected ? (
+                  <Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Box sx={{ textAlign: 'center', minWidth: 100 }}>
+                        <Typography variant="h3" sx={{ fontWeight: 800, color: 'primary.light' }}>
+                          {percent.toFixed(1)}%
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          complete
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <StatusChip value={selected.status} size="medium" />
+                        <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                          {selected.profileName || statusLabel(selected.kind)}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          {selected.currentPhase || selected.error || 'Waiting for worker update'}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <LinearProgress variant="determinate" value={percent} sx={{ height: 10, borderRadius: 5, mb: 3 }} />
+
+                    <Grid container spacing={1.5} sx={{ mb: 3 }}>
+                      <Grid item xs={4}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Checked
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {fmtBytes(selected.completedBytes)} / {fmtBytes(selected.totalBytes)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Performance
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: 'secondary.light' }}>
+                            {fmtSpeed(selected.readBps)}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            Errors
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: (selected.errors?.length || 0) > 0 ? 'error.main' : 'success.main' }}>
+                            {selected.errors?.length || 0}
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+
+                    <JobActions job={selected} role={role} onAction={onAction} verbose />
+                  </Box>
+                ) : (
+                  <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      No test is associated with this drive.
+                    </Typography>
+                  </Paper>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+
+        <Card sx={{ mb: 4, p: 1 }}>
+          <CardContent>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                REAL-TIME MEDIA VIEW
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Full Sector Map
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Mapped from durable byte checkpoints and sector errors
+              </Typography>
+            </Box>
+            <SurfaceMap job={surface} />
+          </CardContent>
+        </Card>
+
+        <Card
+          sx={{
+            mb: 4,
+            p: 1,
+            backgroundColor:
+              assessment.kind === 'suspicious'
+                ? 'rgba(239, 68, 68, 0.08)'
+                : assessment.kind === 'consistent'
+                ? 'rgba(16, 185, 129, 0.08)'
+                : 'rgba(245, 158, 11, 0.08)',
+            border:
+              assessment.kind === 'suspicious'
+                ? '1px solid rgba(239, 68, 68, 0.3)'
+                : assessment.kind === 'consistent'
+                ? '1px solid rgba(16, 185, 129, 0.3)'
+                : '1px solid rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              {assessment.kind === 'suspicious' ? (
+                <WarningIcon color="error" />
+              ) : assessment.kind === 'consistent' ? (
+                <CheckCircleIcon color="success" />
+              ) : (
+                <HelpOutlinedIcon color="warning" />
+              )}
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                {assessment.label}
+              </Typography>
+            </Box>
+            {assessment.evidence.map((item) => (
+              <Typography key={item} variant="body2" sx={{ color: 'text.secondary', ml: 4, mb: 0.5 }}>
+                • {item}
+              </Typography>
+            ))}
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5, fontStyle: 'italic' }}>
+              <strong>Heuristic only:</strong> conflicting counters can indicate a reset but do not prove intentional wiping.
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mb: 4, p: 1 }}>
+          <CardContent>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                COMPLETE DEVICE LOG
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                SMART Attribute Table
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {probe.smartAttributes?.length || 0} attributes · updated {fmtDate(probe.collectedAt)}
+              </Typography>
+            </Box>
+            <Paper sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>ID</TableCell>
+                    <TableCell>Attribute</TableCell>
+                    <TableCell>Current</TableCell>
+                    <TableCell>Worst</TableCell>
+                    <TableCell>Threshold</TableCell>
+                    <TableCell>Raw Value</TableCell>
+                    <TableCell>Failed</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {probe.smartAttributes?.length ? (
+                    probe.smartAttributes.map((attr) => (
+                      <TableRow key={attr.id} hover>
+                        <TableCell>{attr.id}</TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{attr.name}</TableCell>
+                        <TableCell>{attr.current}</TableCell>
+                        <TableCell>{attr.worst}</TableCell>
+                        <TableCell>{attr.threshold}</TableCell>
+                        <TableCell>{attr.rawString || attr.rawValue}</TableCell>
+                        <TableCell>{attr.whenFailed || '—'}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                        The current device snapshot does not include SMART attributes.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mb: 4, p: 1 }}>
+          <CardContent>
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                COMPLETE DEVICE LOG
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Seagate FARM Table
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {farm.length} scalar metrics
+              </Typography>
+            </Box>
+            <Paper sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Metric Path</TableCell>
+                    <TableCell>Value</TableCell>
+                    <TableCell>Source</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {farm.length ? (
+                    farm.map(([metric, val]) => (
+                      <TableRow key={metric} hover>
+                        <TableCell sx={{ fontFamily: 'monospace', color: 'primary.light' }}>
+                          {metric.replaceAll('.', ' › ')}
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 600 }}>{val}</TableCell>
+                        <TableCell>
+                          <Chip size="small" label="FARM log" color="secondary" variant="outlined" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                        {probe.farmAvailable
+                          ? 'The FARM log was returned without displayable scalar fields.'
+                          : 'FARM is unavailable for this device.'}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          </CardContent>
+        </Card>
+
+        <Card sx={{ mb: 4, p: 1 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  EVIDENCE TIMELINE
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                  All Tests for this Drive
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                {driveJobs.length > 0 && role !== 'viewer' && (
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<PictureAsPdfIcon />}
+                    onClick={() => onReport(device.id)}
+                  >
+                    Generate full PDF ({driveJobs.length} tests)
+                  </Button>
+                )}
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {driveJobs.length} retained job{driveJobs.length === 1 ? '' : 's'}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Paper sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Job ID</TableCell>
+                    <TableCell>Test Kind</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Progress</TableCell>
+                    <TableCell>Phase / Details</TableCell>
+                    <TableCell>Speed</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {driveJobs.length ? (
+                    driveJobs.map((j) => (
+                      <TableRow key={j.id} hover>
+                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700 }}>{j.id}</TableCell>
+                        <TableCell>{statusLabel(j.kind)}</TableCell>
+                        <TableCell>
+                          <StatusChip value={j.status} size="small" />
+                        </TableCell>
+                        <TableCell>{((j.progress || 0) * 100).toFixed(1)}%</TableCell>
+                        <TableCell>{j.currentPhase || j.error || '—'}</TableCell>
+                        <TableCell>{fmtSpeed(j.readBps)}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 3 }}>
+                        No tests have been run on this drive.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Paper>
+          </CardContent>
+        </Card>
+      </DialogContent>
+    </Dialog>
   );
 };

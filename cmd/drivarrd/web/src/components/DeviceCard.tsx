@@ -1,4 +1,10 @@
 import React from 'react';
+import { Card, CardContent, Box, Typography, Button, Grid, Divider, Alert } from '@mui/material';
+import StorageIcon from '@mui/icons-material/Storage';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import { Device, Job } from '../types';
 import { StatusChip } from './StatusChip';
 import { fmtBytes, historyAssessment, smartSelfTestLabel, deviceURL } from '../api';
@@ -24,79 +30,148 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({
 }) => {
   const probe = device.probe || {};
   const history = historyAssessment(probe);
-  const testCount = jobs.filter((j) => j.deviceId === device.id).length;
+  const driveJobs = jobs.filter((job) => job.deviceId === device.id);
 
   const facts: [string, string][] = [
     ['Serial', probe.serial || '—'],
     ['Capacity', fmtBytes(probe.capacityBytes)],
-    ['Drive interface', probe.deviceInterface || '—'],
-    ['Recording type', probe.recordingType || '—'],
+    ['Drive Interface', probe.deviceInterface || '—'],
+    ['Recording Type', probe.recordingType || '—'],
     ['Temperature', probe.temperatureC ? `${probe.temperatureC} °C` : '—'],
-    ['SMART', probe.smartAvailable ? (probe.smartPassed ? 'Passed' : 'Failed') : 'Unavailable'],
-    ['Power-on hours', probe.powerOnHours ? probe.powerOnHours.toLocaleString() : '—'],
-    ['Pending sectors', probe.pendingSectors !== undefined ? String(probe.pendingSectors) : '—'],
-    ['FARM', probe.farmAvailable ? 'Available' : 'Unavailable'],
-    ['SMART history', history.label],
+    ['SMART Status', probe.smartAvailable ? (probe.smartPassed ? 'Passed' : 'Failed') : 'Unavailable'],
+    ['Power-on Hours', probe.powerOnHours ? probe.powerOnHours.toLocaleString() : '—'],
+    ['Pending Sectors', probe.pendingSectors !== undefined ? String(probe.pendingSectors) : '—'],
+    ['FARM Telemetry', probe.farmAvailable ? 'Available' : 'Unavailable'],
+    ['SMART History', history.label],
   ];
 
   return (
-    <article className="device-card">
-      <div className="device-title">
-        <div>
-          <h3>{probe.model || device.name || device.id}</h3>
-          <a
-            className="path-link"
-            href={deviceURL(device.id)}
-            onClick={(e) => {
-              e.preventDefault();
-              onOpen(device.id);
-            }}
-            title="Open full-screen drive workspace"
-          >
-            {device.path} <span>OPEN ↗</span>
-          </a>
-        </div>
-        <StatusChip value={device.status} />
-      </div>
+    <Card sx={{ mb: 3 }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: 3,
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'primary.light',
+              }}
+            >
+              <StorageIcon sx={{ fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                {probe.model || device.name || device.id}
+              </Typography>
+              <Typography
+                component="a"
+                href={deviceURL(device.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onOpen(device.id);
+                }}
+                variant="body2"
+                sx={{
+                  color: 'secondary.light',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  fontWeight: 600,
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                {device.path} <OpenInNewIcon sx={{ fontSize: 14 }} />
+              </Typography>
+            </Box>
+          </Box>
+          <StatusChip value={device.status} size="medium" />
+        </Box>
 
-      <div className="facts">
-        {facts.map(([label, value]) => (
-          <div className="fact" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
+        {device.reason && (
+          <Alert severity="warning" sx={{ mb: 2.5, borderRadius: 2 }}>
+            {device.reason}
+          </Alert>
+        )}
 
-      {probe.smartSelfTest && (
-        <div className="smart-test-banner">
-          <StatusChip value="running" />
-          <div>
-            <strong>{smartSelfTestLabel(probe.smartSelfTest)}</strong>
-            <small>Detected from the drive firmware</small>
-          </div>
-        </div>
-      )}
+        {probe.smartSelfTest && (
+          <Alert severity="info" icon={<StatusChip value="running" size="small" />} sx={{ mb: 2.5, borderRadius: 2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              {smartSelfTestLabel(probe.smartSelfTest)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Detected from drive firmware
+            </Typography>
+          </Alert>
+        )}
 
-      {device.reason && <p className="reason">{device.reason}</p>}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {facts.map(([label, value]) => (
+            <Grid item xs={6} sm={4} md={2.4} key={label}>
+              <Box
+                sx={{
+                  p: 1.5,
+                  borderRadius: 2,
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  height: '100%',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontWeight: 500 }}>
+                  {label}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, mt: 0.5, wordBreak: 'break-word' }}>
+                  {value}
+                </Typography>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
 
-      {role !== 'viewer' && (
-        <div className="card-actions">
-          <button className="filled" onClick={() => onTest(device)}>
-            Run test
-          </button>
-          {testCount > 0 && (
-            <button className="tonal" onClick={() => onReport(device.id)}>
-              Full report ({testCount})
-            </button>
+        <Divider sx={{ mb: 2.5 }} />
+
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Button variant="outlined" startIcon={<OpenInNewIcon />} onClick={() => onOpen(device.id)}>
+            Drive details
+          </Button>
+
+          {role !== 'viewer' && (
+            <>
+              {driveJobs.length > 0 && (
+                <Button
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<PictureAsPdfIcon />}
+                  onClick={() => onReport(device.id)}
+                >
+                  Full report ({driveJobs.length})
+                </Button>
+              )}
+
+              {device.status === 'quarantined' && (
+                <Button variant="outlined" color="warning" startIcon={<RefreshIcon />} onClick={() => onRetry(device.id)}>
+                  Retry probe
+                </Button>
+              )}
+
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<PlayArrowIcon />}
+                onClick={() => onTest(device)}
+              >
+                Run test
+              </Button>
+            </>
           )}
-          {device.status === 'quarantined' && (
-            <button className="tonal" onClick={() => onRetry(device.id)}>
-              Retry probe
-            </button>
-          )}
-        </div>
-      )}
-    </article>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };

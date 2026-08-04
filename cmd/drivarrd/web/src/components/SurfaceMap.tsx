@@ -1,4 +1,5 @@
 import React from 'react';
+import { Box, Typography, Tooltip, Grid, Paper } from '@mui/material';
 import { Job } from '../types';
 import { fmtBytes, fmtSpeed } from '../api';
 
@@ -8,7 +9,21 @@ interface SurfaceMapProps {
 
 export const SurfaceMap: React.FC<SurfaceMapProps> = ({ job }) => {
   if (!job) {
-    return <div className="workspace-empty">No surface scan has been run on this drive.</div>;
+    return (
+      <Paper
+        sx={{
+          p: 4,
+          textAlign: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.02)',
+          border: '1px dashed rgba(255, 255, 255, 0.1)',
+          borderRadius: 3,
+        }}
+      >
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          No surface scan has been run on this drive.
+        </Typography>
+      </Paper>
+    );
   }
 
   const cells = 384;
@@ -26,24 +41,68 @@ export const SurfaceMap: React.FC<SurfaceMapProps> = ({ job }) => {
   }
 
   return (
-    <>
-      <div className="map-meta">
-        <span>
-          <strong>{(progress * 100).toFixed(1)}%</strong> scanned
-        </span>
-        <span>
-          <strong>{fmtBytes(job.completedBytes)}</strong> of {fmtBytes(job.totalBytes)}
-        </span>
-        <span>
-          <strong>{fmtSpeed(job.readBps)}</strong> current rate
-        </span>
-        <span>
-          <strong>{bad.size}</strong> affected ranges
-        </span>
-        <span>{job.id}</span>
-      </div>
+    <Box sx={{ width: '100%' }}>
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', p: 1.5, borderRadius: 2 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Scanned
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 700, color: 'primary.light' }}>
+              {(progress * 100).toFixed(1)}%
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', p: 1.5, borderRadius: 2 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Completed Data
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>
+              {fmtBytes(job.completedBytes)} / {fmtBytes(job.totalBytes)}
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', p: 1.5, borderRadius: 2 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Current Speed
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 700, color: 'secondary.light' }}>
+              {fmtSpeed(job.readBps)}
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Box sx={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', p: 1.5, borderRadius: 2 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Bad Blocks
+            </Typography>
+            <Typography
+              variant="body1"
+              sx={{ fontWeight: 700, color: bad.size > 0 ? 'error.main' : 'success.main' }}
+            >
+              {bad.size} ranges
+            </Typography>
+          </Box>
+        </Grid>
+      </Grid>
 
-      <div className="drive-map" role="img" aria-label="Full surface scan block map">
+      <Box
+        role="img"
+        aria-label="Full surface scan block map"
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(10px, 1fr))',
+          gap: '3px',
+          p: 2,
+          backgroundColor: '#090D16',
+          borderRadius: 3,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          maxHeight: 280,
+          overflowY: 'auto',
+        }}
+      >
         {Array.from({ length: cells }, (_, index) => {
           const type = bad.has(index)
             ? 'bad'
@@ -52,33 +111,53 @@ export const SurfaceMap: React.FC<SurfaceMapProps> = ({ job }) => {
             : index === current && progress < 1
             ? 'current'
             : 'good';
+
           const start = Math.floor((index / cells) * total);
           const end = Math.floor(((index + 1) / cells) * total);
 
+          let bgColor = '#1E293B';
+          if (type === 'good') bgColor = '#10B981';
+          if (type === 'current') bgColor = '#3B82F6';
+          if (type === 'bad') bgColor = '#EF4444';
+
           return (
-            <i
+            <Tooltip
               key={index}
-              className={`map-${type}`}
               title={`${fmtBytes(start)}–${fmtBytes(end)} · ${type === 'bad' ? 'unreadable' : type}`}
-            />
+              arrow
+              placement="top"
+            >
+              <Box
+                sx={{
+                  height: 12,
+                  borderRadius: '2px',
+                  backgroundColor: bgColor,
+                  '&:hover': {
+                    transform: 'scale(1.4)',
+                    zIndex: 2,
+                  },
+                }}
+              />
+            </Tooltip>
           );
         })}
-      </div>
+      </Box>
 
-      <div className="map-legend">
-        <span>
-          <i className="map-good" /> Read successfully
-        </span>
-        <span>
-          <i className="map-current" /> Current range
-        </span>
-        <span>
-          <i className="map-bad" /> Unreadable
-        </span>
-        <span>
-          <i className="map-pending" /> Not scanned
-        </span>
-      </div>
-    </>
+      <Box sx={{ display: 'flex', gap: 3, mt: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Read successfully', color: '#10B981' },
+          { label: 'Current range', color: '#3B82F6' },
+          { label: 'Unreadable sector', color: '#EF4444' },
+          { label: 'Not scanned', color: '#1E293B' },
+        ].map((item) => (
+          <Box key={item.label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 12, height: 12, borderRadius: '2px', backgroundColor: item.color }} />
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {item.label}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
   );
 };
