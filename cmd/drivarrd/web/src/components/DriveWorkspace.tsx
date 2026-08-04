@@ -22,6 +22,7 @@ import {
   Chip,
   Paper,
   LinearProgress,
+  Divider,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import StorageIcon from '@mui/icons-material/Storage';
@@ -88,32 +89,33 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
       <Dialog open fullWidth maxWidth="md" onClose={onClose}>
         <DialogTitle sx={{ m: 0, p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+            <Typography variant="caption" color="primary" fontWeight="bold">
               TEST DETAILS
             </Typography>
-            <Typography id="test-detail-title" variant="h5" sx={{ fontWeight: 800 }}>
+            <Typography id="test-detail-title" variant="h5" fontWeight="bold">
               {selected.profileName || statusLabel(selected.kind)}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            <Typography variant="body2" color="text.secondary">
               {probe.model || device.name || device.id} · {device.path}
             </Typography>
           </Box>
-          <IconButton aria-label="Close test details" onClick={onClose} sx={{ color: 'text.secondary' }}>
+          <IconButton aria-label="Close test details" onClick={onClose}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
+
         <DialogContent dividers sx={{ p: 3 }}>
-          <Paper sx={{ p: 3, mb: 3, background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(17, 24, 39, 1) 100%)', borderRadius: 3 }}>
+          <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <StatusChip value={selected.status} size="medium" />
-              <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.light' }}>
+              <Typography variant="h4" fontWeight="bold" color="primary">
                 {percent.toFixed(1)}% complete
               </Typography>
             </Box>
-            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
               {selected.currentPhase || selected.error || 'No additional result details'}
             </Typography>
-            <LinearProgress variant="determinate" value={percent} sx={{ height: 10, borderRadius: 5 }} />
+            <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 1 }} />
           </Paper>
 
           <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -126,11 +128,11 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
               ['Errors', String(selected.errors?.length || 0)],
             ].map(([label, val]) => (
               <Grid item xs={6} sm={4} key={label}>
-                <Paper sx={{ p: 2, backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="caption" color="text.secondary" display="block">
                     {label}
                   </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700, mt: 0.5 }}>
+                  <Typography variant="body1" fontWeight="bold" sx={{ mt: 0.5 }}>
                     {val}
                   </Typography>
                 </Paper>
@@ -139,11 +141,9 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
           </Grid>
 
           {selected.error && (
-            <Paper sx={{ p: 2, mb: 3, backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'error.light', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {selected.error}
-              </Typography>
-            </Paper>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {selected.error}
+            </Alert>
           )}
 
           <Box sx={{ mb: 3 }}>
@@ -152,7 +152,7 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
 
           {selected.kind === 'surface_read' && (
             <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+              <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
                 Sector Map
               </Typography>
               <SurfaceMap job={selected} />
@@ -168,8 +168,8 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
       <DialogTitle
         id="workspace-title"
         sx={{
-          backgroundColor: '#111827',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
           display: 'flex',
           justify: 'space-between',
           alignItems: 'center',
@@ -178,28 +178,15 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 3,
-              background: 'linear-gradient(135deg, #6366F1 0%, #06B6D4 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#FFF',
-            }}
-          >
-            <StorageIcon />
-          </Box>
+          <StorageIcon color="primary" sx={{ fontSize: 32 }} />
           <Box>
-            <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
-              LIVE DRIVE WORKSPACE
+            <Typography variant="caption" color="text.secondary" fontWeight="bold">
+              FULL DRIVE VIEW & WORKSPACE
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 800, lineHeight: 1.1 }}>
+            <Typography variant="h5" fontWeight="bold" lineHeight={1.1}>
               {probe.model || device.name || device.id}
             </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            <Typography variant="caption" color="text.secondary">
               {device.path} · {probe.protocol || 'unknown protocol'} · {fmtBytes(probe.capacityBytes)}
             </Typography>
           </Box>
@@ -207,24 +194,25 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <StatusChip value={device.status} size="medium" />
-          <IconButton aria-label="Close full-screen drive view" onClick={onClose} sx={{ color: 'text.secondary' }}>
+          <IconButton aria-label="Close full-screen drive view" onClick={onClose}>
             <CloseIcon fontSize="large" />
           </IconButton>
         </Box>
       </DialogTitle>
 
-      <DialogContent sx={{ backgroundColor: '#0B0F19', p: 4 }}>
+      <DialogContent sx={{ p: 4 }}>
         <Grid container spacing={3} sx={{ mb: 4 }}>
+          {/* Drive Condition Card */}
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', p: 1 }}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
-                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                <Typography variant="caption" color="primary" fontWeight="bold">
                   DRIVE CONDITION
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
+                <Typography variant="h6" fontWeight="bold" sx={{ mt: 0.5 }}>
                   {probe.model || device.name || device.id}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 2 }}>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
                   Serial {probe.serial || 'unavailable'} · Firmware {probe.firmware || 'unavailable'} · Collected {fmtDate(probe.collectedAt)}
                 </Typography>
 
@@ -240,16 +228,14 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                     ['Uncorrectable', probe.uncorrectableSectors !== undefined ? String(probe.uncorrectableSectors) : '—'],
                   ].map(([label, val]) => (
                     <Grid item xs={6} key={label}>
-                      <Paper sx={{ p: 1.5, backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      <Paper variant="outlined" sx={{ p: 1.5 }}>
+                        <Typography variant="caption" color="text.secondary" display="block">
                           {label}
                         </Typography>
                         <Typography
                           variant="body2"
-                          sx={{
-                            fontWeight: 700,
-                            color: label === 'SMART Health' && probe.smartPassed === false ? 'error.main' : 'text.primary',
-                          }}
+                          fontWeight="bold"
+                          color={label === 'SMART Health' && probe.smartPassed === false ? 'error' : 'text.primary'}
                         >
                           {val}
                         </Typography>
@@ -259,17 +245,15 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                 </Grid>
 
                 {probe.smartSelfTest && (
-                  <Paper sx={{ p: 2, backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <StatusChip value="running" size="small" />
-                      <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {smartSelfTestLabel(probe.smartSelfTest)}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          {probe.smartSelfTest.status || 'Detected from drive firmware'}
-                        </Typography>
-                      </Box>
+                  <Paper variant="outlined" sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <StatusChip value="running" size="small" />
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">
+                        {smartSelfTestLabel(probe.smartSelfTest)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {probe.smartSelfTest.status || 'Detected from drive firmware'}
+                      </Typography>
                     </Box>
                   </Paper>
                 )}
@@ -277,15 +261,16 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
             </Card>
           </Grid>
 
+          {/* Live Progress / Selected Test Card */}
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%', p: 1 }}>
+            <Card variant="outlined" sx={{ height: '100%' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Box>
-                    <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                    <Typography variant="caption" color="secondary" fontWeight="bold">
                       LIVE PROGRESS
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    <Typography variant="h6" fontWeight="bold">
                       Selected Test
                     </Typography>
                   </Box>
@@ -313,53 +298,57 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                   <Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                       <Box sx={{ textAlign: 'center', minWidth: 100 }}>
-                        <Typography variant="h3" sx={{ fontWeight: 800, color: 'primary.light' }}>
+                        <Typography variant="h3" fontWeight="bold" color="primary">
                           {percent.toFixed(1)}%
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        <Typography variant="caption" color="text.secondary">
                           complete
                         </Typography>
                       </Box>
                       <Box sx={{ flex: 1 }}>
                         <StatusChip value={selected.status} size="medium" />
-                        <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ mt: 0.5 }}>
                           {selected.profileName || statusLabel(selected.kind)}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        <Typography variant="body2" color="text.secondary">
                           {selected.currentPhase || selected.error || 'Waiting for worker update'}
                         </Typography>
                       </Box>
                     </Box>
 
-                    <LinearProgress variant="determinate" value={percent} sx={{ height: 10, borderRadius: 5, mb: 3 }} />
+                    <LinearProgress variant="determinate" value={percent} sx={{ height: 8, borderRadius: 1, mb: 3 }} />
 
                     <Grid container spacing={1.5} sx={{ mb: 3 }}>
                       <Grid item xs={4}>
-                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
                             Checked
                           </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          <Typography variant="body2" fontWeight="bold">
                             {fmtBytes(selected.completedBytes)} / {fmtBytes(selected.totalBytes)}
                           </Typography>
                         </Paper>
                       </Grid>
                       <Grid item xs={4}>
-                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
                             Performance
                           </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: 'secondary.light' }}>
+                          <Typography variant="body2" fontWeight="bold" color="secondary">
                             {fmtSpeed(selected.readBps)}
                           </Typography>
                         </Paper>
                       </Grid>
                       <Grid item xs={4}>
-                        <Paper sx={{ p: 1.5, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)' }}>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
+                          <Typography variant="caption" color="text.secondary">
                             Errors
                           </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: (selected.errors?.length || 0) > 0 ? 'error.main' : 'success.main' }}>
+                          <Typography
+                            variant="body2"
+                            fontWeight="bold"
+                            color={(selected.errors?.length || 0) > 0 ? 'error' : 'success'}
+                          >
                             {selected.errors?.length || 0}
                           </Typography>
                         </Paper>
@@ -369,8 +358,8 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                     <JobActions job={selected} role={role} onAction={onAction} verbose />
                   </Box>
                 ) : (
-                  <Paper sx={{ p: 4, textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
                       No test is associated with this drive.
                     </Typography>
                   </Paper>
@@ -380,16 +369,17 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
           </Grid>
         </Grid>
 
-        <Card sx={{ mb: 4, p: 1 }}>
+        {/* Sector Map Card */}
+        <Card variant="outlined" sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+              <Typography variant="caption" color="primary" fontWeight="bold">
                 REAL-TIME MEDIA VIEW
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              <Typography variant="h6" fontWeight="bold">
                 Full Sector Map
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              <Typography variant="caption" color="text.secondary">
                 Mapped from durable byte checkpoints and sector errors
               </Typography>
             </Box>
@@ -397,22 +387,17 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
           </CardContent>
         </Card>
 
+        {/* Drive Wipe Integrity Card */}
         <Card
+          variant="outlined"
           sx={{
             mb: 4,
-            p: 1,
-            backgroundColor:
+            borderColor:
               assessment.kind === 'suspicious'
-                ? 'rgba(239, 68, 68, 0.08)'
+                ? 'error.main'
                 : assessment.kind === 'consistent'
-                ? 'rgba(16, 185, 129, 0.08)'
-                : 'rgba(245, 158, 11, 0.08)',
-            border:
-              assessment.kind === 'suspicious'
-                ? '1px solid rgba(239, 68, 68, 0.3)'
-                : assessment.kind === 'consistent'
-                ? '1px solid rgba(16, 185, 129, 0.3)'
-                : '1px solid rgba(245, 158, 11, 0.3)',
+                ? 'success.main'
+                : 'warning.main',
           }}
         >
           <CardContent>
@@ -424,35 +409,36 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
               ) : (
                 <HelpOutlinedIcon color="warning" />
               )}
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              <Typography variant="h6" fontWeight="bold">
                 {assessment.label}
               </Typography>
             </Box>
             {assessment.evidence.map((item) => (
-              <Typography key={item} variant="body2" sx={{ color: 'text.secondary', ml: 4, mb: 0.5 }}>
+              <Typography key={item} variant="body2" color="text.secondary" sx={{ ml: 4, mb: 0.5 }}>
                 • {item}
               </Typography>
             ))}
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1.5, fontStyle: 'italic' }}>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5, fontStyle: 'italic' }}>
               <strong>Heuristic only:</strong> conflicting counters can indicate a reset but do not prove intentional wiping.
             </Typography>
           </CardContent>
         </Card>
 
-        <Card sx={{ mb: 4, p: 1 }}>
+        {/* SMART Attribute Table Card */}
+        <Card variant="outlined" sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+              <Typography variant="caption" color="secondary" fontWeight="bold">
                 COMPLETE DEVICE LOG
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              <Typography variant="h6" fontWeight="bold">
                 SMART Attribute Table
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              <Typography variant="caption" color="text.secondary">
                 {probe.smartAttributes?.length || 0} attributes · updated {fmtDate(probe.collectedAt)}
               </Typography>
             </Box>
-            <Paper sx={{ overflowX: 'auto' }}>
+            <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -470,7 +456,7 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                     probe.smartAttributes.map((attr) => (
                       <TableRow key={attr.id} hover>
                         <TableCell>{attr.id}</TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{attr.name}</TableCell>
+                        <TableCell fontWeight="bold">{attr.name}</TableCell>
                         <TableCell>{attr.current}</TableCell>
                         <TableCell>{attr.worst}</TableCell>
                         <TableCell>{attr.threshold}</TableCell>
@@ -491,20 +477,21 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
           </CardContent>
         </Card>
 
-        <Card sx={{ mb: 4, p: 1 }}>
+        {/* Seagate FARM Table Card */}
+        <Card variant="outlined" sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+              <Typography variant="caption" color="secondary" fontWeight="bold">
                 COMPLETE DEVICE LOG
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              <Typography variant="h6" fontWeight="bold">
                 Seagate FARM Table
               </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              <Typography variant="caption" color="text.secondary">
                 {farm.length} scalar metrics
               </Typography>
             </Box>
-            <Paper sx={{ overflowX: 'auto' }}>
+            <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -517,10 +504,10 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                   {farm.length ? (
                     farm.map(([metric, val]) => (
                       <TableRow key={metric} hover>
-                        <TableCell sx={{ fontFamily: 'monospace', color: 'primary.light' }}>
+                        <TableCell sx={{ fontFamily: 'monospace' }}>
                           {metric.replaceAll('.', ' › ')}
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 600 }}>{val}</TableCell>
+                        <TableCell fontWeight="bold">{val}</TableCell>
                         <TableCell>
                           <Chip size="small" label="FARM log" color="secondary" variant="outlined" />
                         </TableCell>
@@ -541,14 +528,15 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
           </CardContent>
         </Card>
 
-        <Card sx={{ mb: 4, p: 1 }}>
+        {/* Evidence Timeline Card */}
+        <Card variant="outlined" sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
               <Box>
-                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+                <Typography variant="caption" color="primary" fontWeight="bold">
                   EVIDENCE TIMELINE
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                <Typography variant="h6" fontWeight="bold">
                   All Tests for this Drive
                 </Typography>
               </Box>
@@ -564,13 +552,13 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                     Generate full PDF ({driveJobs.length} tests)
                   </Button>
                 )}
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                <Typography variant="caption" color="text.secondary">
                   {driveJobs.length} retained job{driveJobs.length === 1 ? '' : 's'}
                 </Typography>
               </Box>
             </Box>
 
-            <Paper sx={{ overflowX: 'auto' }}>
+            <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
@@ -586,7 +574,7 @@ export const DriveWorkspace: React.FC<DriveWorkspaceProps> = ({
                   {driveJobs.length ? (
                     driveJobs.map((j) => (
                       <TableRow key={j.id} hover>
-                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: 700 }}>{j.id}</TableCell>
+                        <TableCell sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{j.id}</TableCell>
                         <TableCell>{statusLabel(j.kind)}</TableCell>
                         <TableCell>
                           <StatusChip value={j.status} size="small" />

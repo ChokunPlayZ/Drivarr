@@ -5,7 +5,6 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  TextField,
   Select,
   MenuItem,
   FormControl,
@@ -15,10 +14,14 @@ import {
   Alert,
   IconButton,
   ListSubheader,
+  Slider,
+  Paper,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import WarningIcon from '@mui/icons-material/Warning';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import LockIcon from '@mui/icons-material/Lock';
 import { Device, Profile, Policy } from '../types';
 
 interface TestDialogProps {
@@ -41,18 +44,24 @@ export const TestDialog: React.FC<TestDialogProps> = ({
   const enabledProfiles = profiles.filter((p) => p.enabled);
   const [profileId, setProfileId] = useState(initialProfileId);
   const [policyId, setPolicyId] = useState(policies[0]?.id || '');
-  const [serialConfirmation, setSerialConfirmation] = useState('');
-  const [reauthPassword, setReauthPassword] = useState('');
+  const [swipeValue, setSwipeValue] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const isPreset = profileId.startsWith('preset:');
   const isDestructive = profiles.find((p) => p.id === profileId)?.kind === 'destructive_verify';
+  const isSwipedConfirmed = swipeValue >= 95;
   const probe = device.probe || {};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isDestructive && !isSwipedConfirmed) {
+      setError('Please swipe all the way to the right to confirm destructive erase.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -68,8 +77,7 @@ export const TestDialog: React.FC<TestDialogProps> = ({
       }
 
       if (isDestructive) {
-        body.serialConfirmation = serialConfirmation;
-        body.reauthPassword = reauthPassword;
+        body.serialConfirmation = probe.serial || '';
       }
 
       await onSubmit(body);
@@ -84,25 +92,21 @@ export const TestDialog: React.FC<TestDialogProps> = ({
     <Dialog open fullWidth maxWidth="sm" onClose={onClose}>
       <DialogTitle sx={{ m: 0, p: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
+          <Typography variant="caption" color="primary" fontWeight="bold">
             NEW DIAGNOSTIC TEST
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>
+          <Typography variant="h5" fontWeight="bold">
             {probe.model || device.name || device.id}
           </Typography>
         </Box>
-        <IconButton aria-label="Close" onClick={onClose} sx={{ color: 'text.secondary' }}>
+        <IconButton aria-label="Close" onClick={onClose}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
       <Box component="form" onSubmit={handleSubmit}>
         <DialogContent dividers sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {error && (
-            <Alert severity="error" sx={{ borderRadius: 2 }}>
-              {error}
-            </Alert>
-          )}
+          {error && <Alert severity="error">{error}</Alert>}
 
           <FormControl fullWidth>
             <InputLabel id="profile-select-label">Test Profile</InputLabel>
@@ -110,7 +114,10 @@ export const TestDialog: React.FC<TestDialogProps> = ({
               labelId="profile-select-label"
               value={profileId}
               label="Test Profile"
-              onChange={(e) => setProfileId(e.target.value)}
+              onChange={(e) => {
+                setProfileId(e.target.value);
+                setSwipeValue(0);
+              }}
             >
               <ListSubheader disableSticky>Presets</ListSubheader>
               <MenuItem value="preset:complete-drive-check">
@@ -128,7 +135,7 @@ export const TestDialog: React.FC<TestDialogProps> = ({
           </FormControl>
 
           {isPreset && (
-            <Typography variant="body2" sx={{ color: 'text.secondary', background: 'rgba(255, 255, 255, 0.03)', p: 2, borderRadius: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2, backgroundColor: 'action.hover', borderRadius: 1 }}>
               Runs read speed and random IOPS, a full non-destructive error scan, then the drive firmware’s extended offline SMART self-test.
             </Typography>
           )}
@@ -150,31 +157,52 @@ export const TestDialog: React.FC<TestDialogProps> = ({
           </FormControl>
 
           {isDestructive && (
-            <Alert severity="error" icon={<WarningIcon />} sx={{ borderRadius: 2 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                This permanently erases the entire drive.
+            <Paper variant="outlined" sx={{ p: 2.5, borderColor: 'error.main', backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'error.main', mb: 1 }}>
+                <WarningIcon />
+                <Typography variant="subtitle2" fontWeight="bold">
+                  Destructive Erase Warning
+                </Typography>
+              </Box>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                This test will permanently erase all data on <strong>{probe.model || device.name}</strong> (S/N {probe.serial || 'unavailable'}).
               </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-                <TextField
-                  label="Type the drive serial to confirm"
-                  size="small"
-                  required
-                  fullWidth
-                  value={serialConfirmation}
-                  onChange={(e) => setSerialConfirmation(e.target.value)}
-                />
-                <TextField
-                  label="Re-enter your password"
-                  type="password"
-                  size="small"
-                  required
-                  fullWidth
-                  autoComplete="current-password"
-                  value={reauthPassword}
-                  onChange={(e) => setReauthPassword(e.target.value)}
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  backgroundColor: isSwipedConfirmed ? 'error.dark' : 'background.paper',
+                  border: '1px solid',
+                  borderColor: isSwipedConfirmed ? 'error.main' : 'divider',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography variant="caption" fontWeight="bold" color={isSwipedConfirmed ? '#FFF' : 'text.primary'}>
+                    {isSwipedConfirmed ? 'SWIPE CONFIRMED — UNLOCKED' : 'SWIPE TO CONFIRM ERASE ▶'}
+                  </Typography>
+                  {isSwipedConfirmed ? <LockOpenIcon color="inherit" fontSize="small" /> : <LockIcon color="action" fontSize="small" />}
+                </Box>
+
+                <Slider
+                  value={swipeValue}
+                  onChange={(_, val) => setSwipeValue(val as number)}
+                  onChangeCommitted={(_, val) => {
+                    if ((val as number) < 95) setSwipeValue(0);
+                    else setSwipeValue(100);
+                  }}
+                  color={isSwipedConfirmed ? 'error' : 'primary'}
+                  sx={{
+                    '& .MuiSlider-thumb': {
+                      width: 28,
+                      height: 28,
+                    },
+                  }}
                 />
               </Box>
-            </Alert>
+            </Paper>
           )}
         </DialogContent>
 
@@ -186,7 +214,7 @@ export const TestDialog: React.FC<TestDialogProps> = ({
             type="submit"
             variant="contained"
             color={isDestructive ? 'error' : 'primary'}
-            disabled={loading}
+            disabled={loading || (isDestructive && !isSwipedConfirmed)}
             startIcon={<PlayArrowIcon />}
           >
             {loading ? 'Submitting...' : isPreset ? 'Start preset' : 'Start test'}

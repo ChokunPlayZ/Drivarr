@@ -13,7 +13,6 @@ import {
   Divider,
   LinearProgress,
   Chip,
-  Tooltip,
 } from '@mui/material';
 import StorageIcon from '@mui/icons-material/Storage';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
@@ -24,7 +23,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { Device, Job, Profile, Settings } from '../types';
 import { StatusChip } from './StatusChip';
-import { fmtBytes, fmtDate, statusLabel, smartSelfTestLabel } from '../api';
+import { fmtBytes, statusLabel, smartSelfTestLabel } from '../api';
 
 const activeStatuses = ['queued', 'validating', 'running', 'pause_requested'];
 
@@ -86,7 +85,29 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
           const probe = device.probe || {};
           const driveJobs = jobs.filter((j) => j.deviceId === device.id);
           const activeJob = driveJobs.find((j) => activeStatuses.includes(j.status) || j.status === 'paused');
-          const testCount = driveJobs.length;
+          const completedJobs = driveJobs.filter((j) =>
+            ['completed', 'completed_with_warnings', 'passed'].includes(j.status)
+          );
+
+          // Compute dynamic status chip for the drive
+          let driveChipValue = device.status;
+          let driveChipLabel: string | undefined = undefined;
+
+          if (activeJob) {
+            if (activeJob.status === 'queued') {
+              driveChipValue = 'queued';
+              driveChipLabel =
+                driveJobs.length > 1
+                  ? `Queued (${completedJobs.length}/${driveJobs.length} done)`
+                  : 'Queued';
+            } else if (activeJob.status === 'paused') {
+              driveChipValue = 'paused';
+              driveChipLabel = 'Paused';
+            } else {
+              driveChipValue = 'running';
+              driveChipLabel = `Testing: ${activeJob.profileName || statusLabel(activeJob.kind)}`;
+            }
+          }
 
           return (
             <React.Fragment key={device.id}>
@@ -119,7 +140,7 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
                       <Typography variant="subtitle1" fontWeight="bold">
                         {probe.model || device.name || device.id}
                       </Typography>
-                      <StatusChip value={device.status} />
+                      <StatusChip value={driveChipValue} label={driveChipLabel} />
                       {probe.smartSelfTest && (
                         <Chip
                           size="small"
@@ -137,10 +158,10 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
                       </Typography>
 
                       {activeJob && (
-                        <Box sx={{ mt: 1, maxWid: 400 }}>
+                        <Box sx={{ mt: 1, maxWidth: 450 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography variant="caption" color="primary">
-                              {activeJob.profileName || statusLabel(activeJob.kind)}: {activeJob.currentPhase || 'Running'}
+                            <Typography variant="caption" color="primary" fontWeight="bold">
+                              {activeJob.profileName || statusLabel(activeJob.kind)} ({activeJob.status}): {activeJob.currentPhase || 'In progress'}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               {((activeJob.progress || 0) * 100).toFixed(0)}%
