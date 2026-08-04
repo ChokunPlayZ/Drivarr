@@ -1,10 +1,4 @@
 import React from 'react';
-import { Box, Button, Tooltip } from '@mui/material';
-import PauseIcon from '@mui/icons-material/Pause';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import CancelIcon from '@mui/icons-material/Cancel';
-import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { Job } from '../types';
 
 const activeStatuses = ['queued', 'validating', 'running', 'pause_requested'];
@@ -30,62 +24,36 @@ export const JobActions: React.FC<JobActionsProps> = ({ job, role, onAction, ver
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+    <div className={verbose ? 'workspace-actions' : 'actions'}>
       {job.status === 'running' && ['surface_read', 'destructive_verify'].includes(job.kind) && (
-        <Button
-          size="small"
-          variant={verbose ? 'outlined' : 'text'}
-          color="warning"
-          startIcon={<PauseIcon />}
-          onClick={() => onAction(job, 'pause')}
-        >
+        <button className={verbose ? 'tonal' : ''} onClick={() => onAction(job, 'pause')}>
           {verbose ? 'Pause test' : 'Pause'}
-        </Button>
+        </button>
       )}
 
       {['paused', 'interrupted'].includes(job.status) && (
-        <Button
-          size="small"
-          variant="contained"
-          color="primary"
-          startIcon={<PlayArrowIcon />}
-          onClick={() => onAction(job, 'resume')}
-        >
+        <button className={verbose ? 'filled' : ''} onClick={() => onAction(job, 'resume')}>
           {verbose ? 'Resume test' : 'Resume'}
-        </Button>
+        </button>
       )}
 
       {(active || job.status === 'paused') && (
-        <Button
-          size="small"
-          variant="text"
-          color="error"
-          startIcon={<CancelIcon />}
-          onClick={() => onAction(job, 'cancel')}
-        >
+        <button className={verbose ? 'text-button' : ''} onClick={() => onAction(job, 'cancel')}>
           {verbose ? 'Cancel test' : 'Cancel'}
-        </Button>
+        </button>
       )}
 
       {reportableStatuses.includes(job.status) && (
-        <Button
-          size="small"
-          variant={verbose ? 'contained' : 'outlined'}
-          color="secondary"
-          startIcon={<PictureAsPdfIcon />}
-          onClick={() => onAction(job, 'report')}
-        >
+        <button className={verbose ? 'tonal' : ''} onClick={() => onAction(job, 'report')}>
           {verbose ? 'Generate PDF' : 'PDF'}
-        </Button>
+        </button>
       )}
 
       {deletableStatuses.includes(job.status) && (
-        <Tooltip title="Delete test record">
-          <Button size="small" variant="text" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
-            {verbose ? 'Delete test' : 'Delete'}
-          </Button>
-        </Tooltip>
+        <button className="text-button" onClick={handleDelete}>
+          {verbose ? 'Delete test' : 'Delete'}
+        </button>
       )}
-    </Box>
+    </div>
   );
 };

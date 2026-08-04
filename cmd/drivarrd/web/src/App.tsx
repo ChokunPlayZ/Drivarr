@@ -1,21 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Snackbar,
-  Alert,
-  CircularProgress,
-  Paper,
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import StorageIcon from '@mui/icons-material/Storage';
 import { User, AppData, NoticeState, Device } from './types';
 import { request, routeDevice, deviceURL, reportDownloadURL } from './api';
 import { Navbar } from './components/Navbar';
 import { Login } from './components/Login';
-import { DeviceCard } from './components/DeviceCard';
 import { DriveManager } from './components/DriveManager';
 import { DriveWorkspace } from './components/DriveWorkspace';
 import { TestDialog } from './components/TestDialog';
@@ -33,6 +20,17 @@ const emptyData: AppData = {
 
 const activeStatuses = ['queued', 'validating', 'running', 'pause_requested'];
 
+function Notice({ notice }: { notice: NoticeState | null }) {
+  if (!notice) return null;
+  return (
+    <div id="notice" className={`notice ${notice.error ? 'notice-error' : ''}`}>
+      {notice.message}
+    </div>
+  );
+}
+
+const formObject = (form: HTMLFormElement) => Object.fromEntries(new FormData(form));
+
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [data, setData] = useState<AppData>(emptyData);
@@ -48,6 +46,7 @@ export const App: React.FC = () => {
 
   const notify = useCallback((message: string, error = false) => {
     setNotice({ message, error });
+    setTimeout(() => setNotice(null), 6000);
   }, []);
 
   const handleError = useCallback(
@@ -125,7 +124,6 @@ export const App: React.FC = () => {
     }
   }, [user, handleError]);
 
-  // Initial auth session check
   useEffect(() => {
     request('/api/v1/auth/session')
       .then((session) => {
@@ -135,14 +133,12 @@ export const App: React.FC = () => {
       .catch(() => setUser(null));
   }, []);
 
-  // Poll active state every 3s
   useEffect(() => {
     if (!user) return;
     const timer = setInterval(refreshLive, 3000);
     return () => clearInterval(timer);
   }, [user, refreshLive]);
 
-  // Browser history navigation
   useEffect(() => {
     const pop = () => setWorkspaceId(routeDevice());
     window.addEventListener('popstate', pop);
@@ -226,23 +222,16 @@ export const App: React.FC = () => {
     );
   };
 
+  const activeJobCount = data.jobs.filter((j) => activeStatuses.includes(j.status) || j.status === 'paused').length;
+  const workspaceDevice = data.devices.find((d) => d.id === workspaceId);
+
   if (user === undefined) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 2,
-        }}
-      >
-        <CircularProgress size={48} color="primary" />
-        <Typography variant="body1" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-          Loading Drivarr...
-        </Typography>
-      </Box>
+      <div className="login-shell">
+        <div className="login-card">
+          <p className="supporting">Loading Drivarr…</p>
+        </div>
+      </div>
     );
   }
 
@@ -250,78 +239,48 @@ export const App: React.FC = () => {
     return <Login onLogin={login} />;
   }
 
-  const activeJobCount = data.jobs.filter((j) => activeStatuses.includes(j.status) || j.status === 'paused').length;
-  const workspaceDevice = data.devices.find((d) => d.id === workspaceId);
-
   return (
-    <Box sx={{ minHeight: '100vh', pb: 8 }}>
+    <>
       <Navbar
         user={user}
         deviceCount={data.devices.length}
         connected={connected}
         activeTab={page}
-        onSelectTab={(tab: any) => setPage(tab)}
+        onSelectTab={(tab) => setPage(tab)}
         onLogout={logout}
       />
 
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        {/* Drives Page */}
-        {page === 'drives' && (
-          <Box>
-            <Box
-              sx={{
-                display: 'flex',
-                justify: 'space-between',
-                alignItems: 'center',
-                mb: 4,
-                flexWrap: 'wrap',
-                gap: 2,
-              }}
-            >
-              <Box>
-                <Typography variant="caption" sx={{ color: 'primary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
-                  HARDWARE DIAGNOSTICS
-                </Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                  Connected Physical Drives
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                  Select a test below. Every test available for each drive is shown with its latest result.
-                </Typography>
-              </Box>
+      <main>
+        <Notice notice={notice} />
 
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                {activeJobCount > 0 && (
-                  <Paper
-                    sx={{
-                      px: 2,
-                      py: 1,
-                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                      border: '1px solid rgba(99, 102, 241, 0.3)',
-                      borderRadius: 3,
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.light' }}>
-                      {activeJobCount} test{activeJobCount === 1 ? '' : 's'} running
-                    </Typography>
-                  </Paper>
-                )}
+        <section className={`page ${page === 'drives' ? 'active' : ''}`}>
+          <div className="page-intro">
+            <div>
+              <p className="eyebrow">Drive testing</p>
+              <h1>Drives</h1>
+              <p>Select a test below. Every test available for each drive is shown with its latest result.</p>
+            </div>
+            <div className="intro-actions">
+              {activeJobCount > 0 && (
+                <span className="active-summary">
+                  <i />
+                  {activeJobCount} active
+                </span>
+              )}
+              <button
+                className="refresh-button"
+                onClick={() =>
+                  mutate('/api/v1/discovery/refresh', { method: 'POST' }, 'Looking for drives…', () =>
+                    new Promise((resolve) => setTimeout(() => refreshAll(user).then(resolve), 1000))
+                  )
+                }
+              >
+                ↻ <span>Refresh drives</span>
+              </button>
+            </div>
+          </div>
 
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  startIcon={<RefreshIcon />}
-                  onClick={() =>
-                    mutate('/api/v1/discovery/refresh', { method: 'POST' }, 'Looking for drives...', () =>
-                      new Promise((resolve) => setTimeout(() => refreshAll(user).then(resolve), 1000))
-                    )
-                  }
-                >
-                  Refresh drives
-                </Button>
-              </Box>
-            </Box>
-
+          <div className="drive-stack" aria-live="polite">
             {data.devices.length ? (
               data.devices.map((device) => (
                 <DriveManager
@@ -341,43 +300,27 @@ export const App: React.FC = () => {
                 />
               ))
             ) : (
-              <Paper
-                sx={{
-                  p: 8,
-                  textAlign: 'center',
-                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px dashed rgba(255, 255, 255, 0.1)',
-                  borderRadius: 4,
-                }}
-              >
-                <StorageIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.4 }} />
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  No drives found
-                </Typography>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-                  Connect a drive, then refresh discovery.
-                </Typography>
-              </Paper>
+              <div className="empty-state">
+                <span>▰</span>
+                <h2>No drives found</h2>
+                <p>Connect a drive, then refresh discovery.</p>
+              </div>
             )}
+          </div>
 
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 2, textAlign: 'center' }}>
-              {updated ? `Last checked ${updated.toLocaleTimeString()}` : 'Checking for drives...'}
-            </Typography>
-          </Box>
-        )}
+          <p className="last-updated">
+            {updated ? `Last checked ${updated.toLocaleTimeString()}` : 'Checking for drives…'}
+          </p>
+        </section>
 
-        {/* Reports Page */}
-        {page === 'reports' && (
-          <Box>
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="caption" sx={{ color: 'secondary.light', fontWeight: 700, letterSpacing: '0.05em' }}>
-                TAMPER-EVIDENT EVIDENCE
-              </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800 }}>
-                Generated PDF Reports
-              </Typography>
-            </Box>
-
+        <section className={`page ${page === 'reports' ? 'active' : ''}`}>
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Evidence</p>
+              <h2>PDF reports</h2>
+            </div>
+          </div>
+          <div className="table-card">
             <ReportsTable
               reports={data.reports}
               onVerify={(id) =>
@@ -386,98 +329,97 @@ export const App: React.FC = () => {
                 )
               }
             />
-          </Box>
-        )}
+          </div>
+        </section>
 
-        {/* Admin Settings Page */}
-        {page === 'admin' && user.role === 'admin' && (
-          <AdminPanel
-            settings={data.settings}
-            users={users}
-            audit={audit}
-            onSettings={(form) => {
-              const formData = new FormData(form);
-              const values = Object.fromEntries(formData);
-              return mutate(
-                '/api/v1/settings',
-                {
-                  method: 'PUT',
-                  body: JSON.stringify({
-                    ...data.settings,
-                    organization: values.organization,
-                    maxConcurrentJobs: Number(values.maxConcurrentJobs),
-                    maxDestructiveJobs: Number(values.maxDestructiveJobs),
-                    jobChunkMiB: Number(values.jobChunkMiB),
-                    retentionDays: Number(values.retentionDays),
-                    retentionMaxBytes: Number(values.retentionMaxBytes),
-                    destructiveEnabled: values.destructiveEnabled === 'on',
-                  }),
-                },
-                'Settings saved'
-              );
-            }}
-            onUser={(form) =>
-              mutate(
-                '/api/v1/users',
-                {
-                  method: 'POST',
-                  body: JSON.stringify(Object.fromEntries(new FormData(form))),
-                },
-                'User created',
-                refreshAdmin
-              )
-            }
-            onPassword={async (form) => {
-              await mutate(
-                '/api/v1/auth/password',
-                {
-                  method: 'POST',
-                  body: JSON.stringify(Object.fromEntries(new FormData(form))),
-                },
-                'Password changed. Sign in again.'
-              );
-              setUser(null);
-            }}
-            onProfile={(form) => {
-              const values = Object.fromEntries(new FormData(form));
-              return mutate(
-                '/api/v1/profiles',
-                {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    ...values,
-                    blockSizeKiB: Number(values.blockSizeKiB),
-                    queueDepth: Number(values.queueDepth),
-                    durationSeconds: Number(values.durationSeconds),
-                    rateMiB: Number(values.rateMiB),
-                  }),
-                },
-                'Advanced profile created'
-              );
-            }}
-            onPolicy={(form) => {
-              const values = Object.fromEntries(new FormData(form));
-              return mutate(
-                '/api/v1/policies',
-                {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    name: values.name,
-                    failOnSmart: values.failOnSmart === 'on',
-                    failOnIoError: values.failOnIoError === 'on',
-                    warnPendingAbove: Number(values.warnPendingAbove),
-                    warnReallocatedAbove: Number(values.warnReallocatedAbove),
-                    warnUncorrectableAbove: Number(values.warnUncorrectableAbove),
-                  }),
-                },
-                'Grading policy created'
-              );
-            }}
-          />
-        )}
-      </Container>
+        <section className={`page ${page === 'admin' ? 'active' : ''}`}>
+          {user.role === 'admin' && (
+            <AdminPanel
+              settings={data.settings}
+              users={users}
+              audit={audit}
+              onSettings={(form) => {
+                const values = formObject(form);
+                return mutate(
+                  '/api/v1/settings',
+                  {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                      ...data.settings,
+                      organization: values.organization,
+                      maxConcurrentJobs: Number(values.maxConcurrentJobs),
+                      maxDestructiveJobs: Number(values.maxDestructiveJobs),
+                      jobChunkMiB: Number(values.jobChunkMiB),
+                      retentionDays: Number(values.retentionDays),
+                      retentionMaxBytes: Number(values.retentionMaxBytes),
+                      destructiveEnabled: values.destructiveEnabled === 'on',
+                    }),
+                  },
+                  'Settings saved'
+                );
+              }}
+              onUser={(form) =>
+                mutate(
+                  '/api/v1/users',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify(formObject(form)),
+                  },
+                  'User created',
+                  refreshAdmin
+                )
+              }
+              onPassword={async (form) => {
+                await mutate(
+                  '/api/v1/auth/password',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify(formObject(form)),
+                  },
+                  'Password changed. Sign in again.'
+                );
+                setUser(null);
+              }}
+              onProfile={(form) => {
+                const values = formObject(form);
+                return mutate(
+                  '/api/v1/profiles',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      ...values,
+                      blockSizeKiB: Number(values.blockSizeKiB),
+                      queueDepth: Number(values.queueDepth),
+                      durationSeconds: Number(values.durationSeconds),
+                      rateMiB: Number(values.rateMiB),
+                    }),
+                  },
+                  'Advanced profile created'
+                );
+              }}
+              onPolicy={(form) => {
+                const values = formObject(form);
+                return mutate(
+                  '/api/v1/policies',
+                  {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      name: values.name,
+                      failOnSmart: values.failOnSmart === 'on',
+                      failOnIoError: values.failOnIoError === 'on',
+                      warnPendingAbove: Number(values.warnPendingAbove),
+                      warnReallocatedAbove: Number(values.warnReallocatedAbove),
+                      warnUncorrectableAbove: Number(values.warnUncorrectableAbove),
+                    }),
+                  },
+                  'Grading policy created'
+                );
+              }}
+            />
+          )}
+        </section>
+      </main>
 
-      {/* Test Launch Dialog */}
       {testDevice && (
         <TestDialog
           device={testDevice.device}
@@ -499,7 +441,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Workspace Dialog */}
       {workspaceDevice && (
         <DriveWorkspace
           device={workspaceDevice}
@@ -511,20 +452,6 @@ export const App: React.FC = () => {
           onReport={driveReport}
         />
       )}
-
-      {/* Global Toast / Snackbar */}
-      <Snackbar
-        open={Boolean(notice)}
-        autoHideDuration={6000}
-        onClose={() => setNotice(null)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        {notice ? (
-          <Alert onClose={() => setNotice(null)} severity={notice.error ? 'error' : 'success'} sx={{ width: '100%', borderRadius: 3 }}>
-            {notice.message}
-          </Alert>
-        ) : undefined}
-      </Snackbar>
-    </Box>
+    </>
   );
 };
