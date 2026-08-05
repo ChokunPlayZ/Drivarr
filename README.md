@@ -12,6 +12,7 @@ requests, or hardware access.
 ## Features
 
 - SATA, SAS, NVMe, and USB-backed Linux block-device discovery
+- One-click safe eject that powers off idle drives before physical removal
 - SMART telemetry and short, extended, and conveyance self-tests, with
   automatic detection and progress display for tests already running in drive
   firmware

@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -11,6 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+var ErrDeviceNotFound = errors.New("device not found")
 
 type SMARTAttribute struct {
 	ID         int    `json:"id"`
@@ -183,7 +186,7 @@ func (s *Supervisor) probeBatch(ctx context.Context, devices []discoveredDevice)
 	for _, device := range devices {
 		s.mu.RLock()
 		state := s.devices[device.ID]
-		skip := state != nil && (state.Status == "probing" || state.Status == "quarantined")
+		skip := state != nil && (state.Status == "probing" || state.Status == "quarantined" || state.Status == "ejecting")
 		s.mu.RUnlock()
 		if skip {
 			continue
@@ -205,7 +208,7 @@ func (s *Supervisor) probeBatch(ctx context.Context, devices []discoveredDevice)
 func (s *Supervisor) probeKnown(parent context.Context, id string, manual bool) {
 	s.mu.Lock()
 	device, ok := s.devices[id]
-	if !ok || (device.Status == "quarantined" && !manual) || device.Status == "probing" {
+	if !ok || (device.Status == "quarantined" && !manual) || device.Status == "probing" || device.Status == "ejecting" {
 		s.mu.Unlock()
 		return
 	}
@@ -285,6 +288,52 @@ func (s *Supervisor) Retry(id string) bool {
 		s.logger.Warn("manual retry queue full", "device", id)
 	}
 	return true
+}
+
+// Eject asks an isolated worker to safely power off a drive. The device stays
+// visible with an "ejecting" state while the operation is in progress and is
+// removed from the snapshot after the operating system accepts the request.
+func (s *Supervisor) Eject(parent context.Context, id string) error {
+	s.mu.Lock()
+	device, ok := s.devices[id]
+	if !ok {
+		s.mu.Unlock()
+		return ErrDeviceNotFound
+	}
+	if device.Status == "probing" || device.Status == "ejecting" {
+		status := device.Status
+		s.mu.Unlock()
+		return fmt.Errorf("drive is currently %s", status)
+	}
+	previousStatus, previousReason := device.Status, device.Reason
+	device.Status = "ejecting"
+	device.Reason = "Preparing the drive for safe removal."
+	path := device.Path
+	s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+	result := s.runner.Run(ctx, s.executable, "internal-worker", "eject", "--device", path)
+	cancel()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	device, stillPresent := s.devices[id]
+	if result.Err != nil {
+		if stillPresent {
+			device.Status = previousStatus
+			device.Reason = previousReason
+			if result.TimedOut {
+				now := time.Now().UTC()
+				device.Status = "quarantined"
+				device.Reason = "The safe-eject operation timed out; the drive was quarantined."
+				device.QuarantinedAt = &now
+				device.ManualRetryOnly = true
+			}
+		}
+		return result.Err
+	}
+	delete(s.devices, id)
+	return nil
 }
 
 func (s *Supervisor) Device(id string) (DeviceState, bool) {

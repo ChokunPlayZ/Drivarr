@@ -48,6 +48,11 @@ paths:
       summary: Generate an immutable full-drive PDF containing every retained test
       parameters: [{name: id, in: path, required: true, schema: {type: string}}]
       responses: {'201': {description: Full drive report created}, '400': {description: No retained tests}}
+  /devices/{id}/eject:
+    post:
+      summary: Safely power off a drive for physical removal
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Drive safely ejected}, '409': {description: Drive has an active test}}
   /reports:
     get: {summary: Issued reports, responses: {'200': {description: Reports}}}
   /profiles:

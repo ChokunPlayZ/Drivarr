@@ -342,6 +342,16 @@ func runWorker(args []string) error {
 		return workerBadblocks(args[1:], os.Stdout)
 	case "safety-check":
 		return workerSafety(args[1:], os.Stdout)
+	case "eject":
+		flags := flag.NewFlagSet("eject", flag.ContinueOnError)
+		device := flags.String("device", "", "device path")
+		if err := flags.Parse(args[1:]); err != nil {
+			return err
+		}
+		if *device == "" || !strings.HasPrefix(*device, "/dev/") {
+			return errors.New("valid /dev device path required")
+		}
+		return workerEject(*device)
 	case "smart-test":
 		return workerSMARTTest(args[1:], os.Stdout)
 	case "smart-abort":
@@ -349,6 +359,19 @@ func runWorker(args []string) error {
 	default:
 		return fmt.Errorf("unsupported worker operation %q", args[0])
 	}
+}
+
+func workerEject(device string) error {
+	command := exec.Command("udisksctl", "power-off", "--block-device", device, "--no-user-interaction")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		detail := strings.TrimSpace(string(output))
+		if detail != "" {
+			return fmt.Errorf("safe eject failed: %w: %s", err, detail)
+		}
+		return fmt.Errorf("safe eject failed: %w", err)
+	}
+	return nil
 }
 
 func workerDiscover(output io.Writer) error {

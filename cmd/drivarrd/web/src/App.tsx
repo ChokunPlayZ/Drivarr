@@ -318,6 +318,14 @@ export const App: React.FC = () => {
               onRetry={(id) =>
                 mutate(`/api/v1/devices/${encodeURIComponent(id)}/retry`, { method: 'POST' }, 'Manual probe scheduled')
               }
+              onEject={async (id) => {
+                await mutate(
+                  `/api/v1/devices/${encodeURIComponent(id)}/eject`,
+                  { method: 'POST' },
+                  'Drive safely ejected'
+                );
+                if (workspaceId === id) closeWorkspace();
+              }}
             />
 
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>

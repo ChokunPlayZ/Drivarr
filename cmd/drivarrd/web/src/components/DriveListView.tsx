@@ -21,11 +21,12 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import EjectIcon from '@mui/icons-material/Eject';
 import { Device, Job, Profile, Settings } from '../types';
 import { StatusChip } from './StatusChip';
 import { fmtBytes, statusLabel, smartSelfTestLabel } from '../api';
 
-const activeStatuses = ['queued', 'validating', 'running', 'pause_requested'];
+const activeStatuses = ['queued', 'validating', 'running', 'pause_requested', 'cancel_requested'];
 
 interface DriveListViewProps {
   devices: Device[];
@@ -38,6 +39,7 @@ interface DriveListViewProps {
   onAction: (job: Job, action: string) => void;
   onReport: (id: string) => void;
   onRetry: (id: string) => void;
+  onEject: (id: string) => void;
 }
 
 export const DriveListView: React.FC<DriveListViewProps> = ({
@@ -51,6 +53,7 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
   onAction,
   onReport,
   onRetry,
+  onEject,
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -121,13 +124,30 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
                 }}
                 onClick={() => onOpen(device.id)}
                 secondaryAction={
-                  <IconButton
-                    edge="end"
-                    aria-label={`Options menu for ${probe.model || device.name}`}
-                    onClick={(e) => handleOpenMenu(e, device)}
-                  >
-                    <MoreVertIcon />
-                  </IconButton>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    {role !== 'viewer' && (
+                      <IconButton
+                        aria-label={`Eject ${probe.model || device.name}`}
+                        title={activeJob ? 'Finish or cancel the active test before ejecting' : 'Safely eject drive'}
+                        disabled={Boolean(activeJob) || device.status === 'probing' || device.status === 'ejecting'}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (window.confirm(`Safely eject ${probe.model || device.name || device.path}?`)) {
+                            onEject(device.id);
+                          }
+                        }}
+                      >
+                        <EjectIcon />
+                      </IconButton>
+                    )}
+                    <IconButton
+                      edge="end"
+                      aria-label={`Options menu for ${probe.model || device.name}`}
+                      onClick={(e) => handleOpenMenu(e, device)}
+                    >
+                      <MoreVertIcon />
+                    </IconButton>
+                  </Box>
                 }
               >
                 <ListItemIcon sx={{ minWidth: 48 }}>

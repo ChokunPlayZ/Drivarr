@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"drivarr/internal/core"
+	"drivarr/internal/guard"
 	"drivarr/internal/report"
 )
 
@@ -40,10 +41,33 @@ func (a *api) registerApplicationRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/reports", a.require(a.listReports, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/jobs/{id}/report", a.require(a.generateReport, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/devices/{id}/report", a.require(a.generateDriveReport, core.RoleOperator, core.RoleAdmin))
+	mux.Handle("POST /api/v1/devices/{id}/eject", a.require(a.ejectDevice, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/download", a.require(a.downloadReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/checksum", a.require(a.downloadChecksum, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/verify", a.require(a.verifyReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/audit", a.require(a.audit, core.RoleAdmin))
+}
+
+func (a *api) ejectDevice(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	for _, job := range a.store.Jobs() {
+		if job.DeviceID == id && (job.Status == core.JobQueued || job.Status == core.JobValidating ||
+			job.Status == core.JobRunning || job.Status == core.JobPauseRequested ||
+			job.Status == core.JobPaused || job.Status == core.JobCancelRequested) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "cancel or finish the active test before ejecting this drive"})
+			return
+		}
+	}
+	if err := a.supervisor.Eject(r.Context(), id); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, guard.ErrDeviceNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	a.store.Audit(requestUser(r).ID, "device.eject", id, remoteIP(r), nil)
+	writeJSON(w, http.StatusOK, map[string]string{"status": "drive safely ejected"})
 }
 
 func (a *api) require(next http.HandlerFunc, roles ...core.Role) http.Handler {
