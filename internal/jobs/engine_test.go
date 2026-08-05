@@ -203,3 +203,21 @@ func TestDeleteOnlyRemovesIncompleteOrFailedJobs(t *testing.T) {
 		t.Fatal("completed job was removed")
 	}
 }
+
+func TestTryLockDeviceDoesNotWaitBehindActiveOperation(t *testing.T) {
+	engine := &Engine{deviceLocks: make(map[string]*sync.Mutex)}
+	unlock, ok := engine.TryLockDevice("drive")
+	if !ok {
+		t.Fatal("first maintenance lock was unavailable")
+	}
+	if secondUnlock, secondOK := engine.TryLockDevice("drive"); secondOK {
+		secondUnlock()
+		t.Fatal("second maintenance lock unexpectedly succeeded")
+	}
+	unlock()
+	thirdUnlock, ok := engine.TryLockDevice("drive")
+	if !ok {
+		t.Fatal("maintenance lock was not released")
+	}
+	thirdUnlock()
+}

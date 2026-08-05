@@ -53,6 +53,11 @@ paths:
       summary: Safely power off a drive for physical removal
       parameters: [{name: id, in: path, required: true, schema: {type: string}}]
       responses: {'200': {description: Drive safely ejected}, '409': {description: Drive has an active test}}
+  /devices/{id}/partition:
+    post:
+      summary: Replace a drive partition table and create one full-disk partition (administrator only)
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: Partition created}, '400': {description: Unsafe or invalid request}, '401': {description: Reauthentication failed}, '409': {description: Drive has an active test}}
   /reports:
     get: {summary: Issued reports, responses: {'200': {description: Reports}}}
   /profiles:

@@ -15,6 +15,14 @@ import (
 
 var ErrDeviceNotFound = errors.New("device not found")
 
+type PartitionResult struct {
+	DevicePath    string `json:"devicePath"`
+	PartitionPath string `json:"partitionPath"`
+	Table         string `json:"table"`
+	Filesystem    string `json:"filesystem"`
+	Label         string `json:"label,omitempty"`
+}
+
 type SMARTAttribute struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
@@ -186,7 +194,8 @@ func (s *Supervisor) probeBatch(ctx context.Context, devices []discoveredDevice)
 	for _, device := range devices {
 		s.mu.RLock()
 		state := s.devices[device.ID]
-		skip := state != nil && (state.Status == "probing" || state.Status == "quarantined" || state.Status == "ejecting")
+		skip := state != nil && (state.Status == "probing" || state.Status == "quarantined" ||
+			state.Status == "ejecting" || state.Status == "partitioning")
 		s.mu.RUnlock()
 		if skip {
 			continue
@@ -208,7 +217,8 @@ func (s *Supervisor) probeBatch(ctx context.Context, devices []discoveredDevice)
 func (s *Supervisor) probeKnown(parent context.Context, id string, manual bool) {
 	s.mu.Lock()
 	device, ok := s.devices[id]
-	if !ok || (device.Status == "quarantined" && !manual) || device.Status == "probing" || device.Status == "ejecting" {
+	if !ok || (device.Status == "quarantined" && !manual) || device.Status == "probing" ||
+		device.Status == "ejecting" || device.Status == "partitioning" {
 		s.mu.Unlock()
 		return
 	}
@@ -334,6 +344,66 @@ func (s *Supervisor) Eject(parent context.Context, id string) error {
 	}
 	delete(s.devices, id)
 	return nil
+}
+
+// Partition asks an isolated worker to replace a drive's partition table and
+// create one full-disk partition. Callers are responsible for authorization,
+// reauthentication, and ensuring no Drivarr job is active for the device. The
+// worker performs its own fresh mount/swap/holder safety check immediately
+// before the first write.
+func (s *Supervisor) Partition(parent context.Context, id, table, filesystem, label string) (PartitionResult, error) {
+	s.mu.Lock()
+	device, ok := s.devices[id]
+	if !ok {
+		s.mu.Unlock()
+		return PartitionResult{}, ErrDeviceNotFound
+	}
+	if device.Status != "ready" {
+		status := device.Status
+		s.mu.Unlock()
+		return PartitionResult{}, fmt.Errorf("drive is currently %s", status)
+	}
+	previousReason := device.Reason
+	device.Status = "partitioning"
+	device.Reason = "Replacing the partition table. Do not disconnect the drive."
+	path := device.Path
+	s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(parent, 60*time.Second)
+	result := s.runner.Run(ctx, s.executable, "internal-worker", "partition", "--device", path,
+		"--table", table, "--filesystem", filesystem, "--label", label)
+	cancel()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	device, stillPresent := s.devices[id]
+	if result.Err != nil {
+		if stillPresent {
+			device.Status = "ready"
+			device.Reason = previousReason
+			if result.TimedOut {
+				now := time.Now().UTC()
+				device.Status = "quarantined"
+				device.Reason = "The partition operation timed out; the drive was quarantined. Inspect it before retrying."
+				device.QuarantinedAt = &now
+				device.ManualRetryOnly = true
+			}
+		}
+		return PartitionResult{}, result.Err
+	}
+	var partitioned PartitionResult
+	if err := json.Unmarshal(result.Output, &partitioned); err != nil {
+		if stillPresent {
+			device.Status = "unavailable"
+			device.Reason = "Partition worker returned invalid data; inspect the drive before retrying."
+		}
+		return PartitionResult{}, fmt.Errorf("decode partition result: %w", err)
+	}
+	if stillPresent {
+		device.Status = "ready"
+		device.Reason = ""
+	}
+	return partitioned, nil
 }
 
 func (s *Supervisor) Device(id string) (DeviceState, bool) {

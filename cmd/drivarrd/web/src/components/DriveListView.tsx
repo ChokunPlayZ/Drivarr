@@ -22,6 +22,7 @@ import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import EjectIcon from '@mui/icons-material/Eject';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import { Device, Job, Profile, Settings } from '../types';
 import { StatusChip } from './StatusChip';
 import { fmtBytes, statusLabel, smartSelfTestLabel } from '../api';
@@ -40,6 +41,7 @@ interface DriveListViewProps {
   onReport: (id: string) => void;
   onRetry: (id: string) => void;
   onEject: (id: string) => void;
+  onPartition: (device: Device) => void;
 }
 
 export const DriveListView: React.FC<DriveListViewProps> = ({
@@ -54,6 +56,7 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
   onReport,
   onRetry,
   onEject,
+  onPartition,
 }) => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
@@ -277,6 +280,23 @@ export const DriveListView: React.FC<DriveListViewProps> = ({
                   <RefreshIcon fontSize="small" color="warning" />
                 </ListItemIcon>
                 <ListItemText primary="Retry probe" />
+              </MenuItem>
+            )}
+
+            {role === 'admin' && settings?.destructiveEnabled && selectedDevice.probe?.serial && selectedDevice.status === 'ready' && !jobs.some(
+              (job) => job.deviceId === selectedDevice.id && (activeStatuses.includes(job.status) || job.status === 'paused')
+            ) && (
+              <MenuItem
+                onClick={() => {
+                  const dev = selectedDevice;
+                  handleCloseMenu();
+                  onPartition(dev);
+                }}
+              >
+                <ListItemIcon>
+                  <AccountTreeIcon fontSize="small" color="error" />
+                </ListItemIcon>
+                <ListItemText primary="Partition drive…" secondary="Erases all existing data" />
               </MenuItem>
             )}
           </Box>

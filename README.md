@@ -13,6 +13,7 @@ requests, or hardware access.
 
 - SATA, SAS, NVMe, and USB-backed Linux block-device discovery
 - One-click safe eject that powers off idle drives before physical removal
+- Guarded single-partition drive setup with GPT/MBR and optional ext4 formatting
 - SMART telemetry and short, extended, and conveyance self-tests, with
   automatic detection and progress display for tests already running in drive
   firmware
@@ -53,6 +54,10 @@ Destructive verification is disabled by default. Starting it requires:
 4. Password reauthentication.
 5. A fresh isolated check proving the drive and its children are not mounted,
    swap-backed, or held by device-mapper/RAID.
+
+Partitioning uses the same destructive-operation toggle and safeguards, is
+restricted to administrators, and creates one full-disk partition. The drive
+must expose a serial number so the operator can confirm the exact target.
 
 Drivarr cannot recover a host whose kernel or complete storage bus has frozen.
 It prevents a blocked userspace hardware operation from taking down Drivarr or

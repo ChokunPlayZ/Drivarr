@@ -20,6 +20,7 @@ import { DriveWorkspace } from './components/DriveWorkspace';
 import { TestDialog } from './components/TestDialog';
 import { ReportsTable } from './components/ReportsTable';
 import { AdminPanel } from './components/AdminPanel';
+import { PartitionDialog } from './components/PartitionDialog';
 
 const emptyData: AppData = {
   devices: [],
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
   const [testDevice, setTestDevice] = useState<{ device: Device; profileId: string } | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(routeDevice());
   const [workspaceJobId, setWorkspaceJobId] = useState<string | null>(null);
+  const [partitionDevice, setPartitionDevice] = useState<Device | null>(null);
 
   const notify = useCallback((message: string, error = false) => {
     setNotice({ message, error });
@@ -326,6 +328,7 @@ export const App: React.FC = () => {
                 );
                 if (workspaceId === id) closeWorkspace();
               }}
+              onPartition={setPartitionDevice}
             />
 
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2, textAlign: 'center' }}>
@@ -455,6 +458,22 @@ export const App: React.FC = () => {
               body.presetId ? 'Complete check queued' : 'Test queued'
             );
             setTestDevice(null);
+          }}
+        />
+      )}
+
+      {partitionDevice && (
+        <PartitionDialog
+          device={partitionDevice}
+          onClose={() => setPartitionDevice(null)}
+          onSubmit={async (body) => {
+            const result = await mutate(
+              `/api/v1/devices/${encodeURIComponent(partitionDevice.id)}/partition`,
+              { method: 'POST', body: JSON.stringify(body) },
+              (res: any) => `Created ${res.partitionPath}${res.filesystem === 'none' ? '' : ` with ${res.filesystem}`}`
+            );
+            setPartitionDevice(null);
+            return result;
           }}
         />
       )}

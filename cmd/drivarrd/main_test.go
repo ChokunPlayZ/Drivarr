@@ -25,6 +25,42 @@ func (idleRunner) Run(context.Context, string, ...string) guard.RunResult {
 
 func (idleRunner) BlockedProcesses() int64 { return 0 }
 
+func TestPartitionRequestValidation(t *testing.T) {
+	valid := []struct{ device, table, filesystem, label string }{
+		{"/dev/sdb", "gpt", "ext4", "Archive 1"},
+		{"/dev/nvme0n1", "mbr", "none", ""},
+	}
+	for _, test := range valid {
+		if err := validatePartitionRequest(test.device, test.table, test.filesystem, test.label); err != nil {
+			t.Fatalf("valid request rejected: %v", err)
+		}
+	}
+	invalid := []struct{ device, table, filesystem, label string }{
+		{"/tmp/sdb", "gpt", "ext4", ""},
+		{"/dev/disk/by-id/x", "gpt", "ext4", ""},
+		{"/dev/sdb", "apm", "ext4", ""},
+		{"/dev/sdb", "gpt", "xfs", ""},
+		{"/dev/sdb", "gpt", "none", "label"},
+		{"/dev/sdb", "gpt", "ext4", strings.Repeat("x", 17)},
+		{"/dev/sdb", "gpt", "ext4", "bad/label"},
+	}
+	for _, test := range invalid {
+		if err := validatePartitionRequest(test.device, test.table, test.filesystem, test.label); err == nil {
+			t.Fatalf("invalid request accepted: %+v", test)
+		}
+	}
+}
+
+func TestFirstPartitionPath(t *testing.T) {
+	for device, want := range map[string]string{
+		"/dev/sdb": "/dev/sdb1", "/dev/nvme0n1": "/dev/nvme0n1p1", "/dev/loop0": "/dev/loop0p1",
+	} {
+		if got := firstPartitionPath(device); got != want {
+			t.Errorf("firstPartitionPath(%q) = %q, want %q", device, got, want)
+		}
+	}
+}
+
 func TestStylesheetIsEmbeddedAndServed(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	supervisor := guard.NewSupervisor(idleRunner{}, "drivarrd", time.Second, 1, logger)

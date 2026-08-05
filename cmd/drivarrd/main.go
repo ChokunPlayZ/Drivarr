@@ -352,6 +352,8 @@ func runWorker(args []string) error {
 			return errors.New("valid /dev device path required")
 		}
 		return workerEject(*device)
+	case "partition":
+		return workerPartition(args[1:], os.Stdout)
 	case "smart-test":
 		return workerSMARTTest(args[1:], os.Stdout)
 	case "smart-abort":
@@ -372,6 +374,117 @@ func workerEject(device string) error {
 		return fmt.Errorf("safe eject failed: %w", err)
 	}
 	return nil
+}
+
+func workerPartition(args []string, output io.Writer) error {
+	flags := flag.NewFlagSet("partition", flag.ContinueOnError)
+	device := flags.String("device", "", "device path")
+	table := flags.String("table", "gpt", "partition table (gpt or mbr)")
+	filesystem := flags.String("filesystem", "ext4", "filesystem (ext4 or none)")
+	label := flags.String("label", "", "filesystem label")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if err := validatePartitionRequest(*device, *table, *filesystem, *label); err != nil {
+		return err
+	}
+	safety, err := inspectDeviceSafety(*device)
+	if err != nil {
+		return err
+	}
+	if !safety.Safe {
+		return fmt.Errorf("drive is not safe to partition: %s", strings.Join(safety.Reasons, "; "))
+	}
+	sfdisk, err := exec.LookPath("sfdisk")
+	if err != nil {
+		return fmt.Errorf("sfdisk unavailable: %w", err)
+	}
+	command := exec.Command(sfdisk, "--wipe", "always", "--wipe-partitions", "always", *device)
+	command.Stdin = strings.NewReader(partitionScript(*table))
+	if raw, runErr := command.CombinedOutput(); runErr != nil {
+		return fmt.Errorf("create partition table: %w: %s", runErr, strings.TrimSpace(string(raw)))
+	}
+	if partprobe, lookupErr := exec.LookPath("partprobe"); lookupErr == nil {
+		if raw, runErr := exec.Command(partprobe, *device).CombinedOutput(); runErr != nil {
+			return fmt.Errorf("notify kernel of partition table: %w: %s", runErr, strings.TrimSpace(string(raw)))
+		}
+	}
+	if udevadm, lookupErr := exec.LookPath("udevadm"); lookupErr == nil {
+		_ = exec.Command(udevadm, "settle", "--timeout=10").Run()
+	}
+	partitionPath := firstPartitionPath(*device)
+	if waitErr := waitForPartition(partitionPath, 5*time.Second); waitErr != nil {
+		return waitErr
+	}
+	if *filesystem == "ext4" {
+		mkfs, lookupErr := exec.LookPath("mkfs.ext4")
+		if lookupErr != nil {
+			return fmt.Errorf("mkfs.ext4 unavailable: %w", lookupErr)
+		}
+		mkfsArgs := []string{"-F"}
+		if *label != "" {
+			mkfsArgs = append(mkfsArgs, "-L", *label)
+		}
+		mkfsArgs = append(mkfsArgs, partitionPath)
+		if raw, runErr := exec.Command(mkfs, mkfsArgs...).CombinedOutput(); runErr != nil {
+			return fmt.Errorf("format partition: %w: %s", runErr, strings.TrimSpace(string(raw)))
+		}
+	}
+	return json.NewEncoder(output).Encode(guard.PartitionResult{
+		DevicePath: *device, PartitionPath: partitionPath, Table: *table, Filesystem: *filesystem, Label: *label,
+	})
+}
+
+func waitForPartition(path string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("partition device %s did not appear", path)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func validatePartitionRequest(device, table, filesystem, label string) error {
+	if device == "" || !strings.HasPrefix(device, "/dev/") || strings.ContainsAny(strings.TrimPrefix(device, "/dev/"), "/\\") {
+		return errors.New("valid whole-device /dev path required")
+	}
+	if table != "gpt" && table != "mbr" {
+		return errors.New("partition table must be gpt or mbr")
+	}
+	if filesystem != "ext4" && filesystem != "none" {
+		return errors.New("filesystem must be ext4 or none")
+	}
+	if len(label) > 16 {
+		return errors.New("filesystem label must be at most 16 characters")
+	}
+	for _, char := range label {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') || char == '-' || char == '_' || char == ' ') {
+			return errors.New("filesystem label may contain only letters, numbers, spaces, hyphens, and underscores")
+		}
+	}
+	if filesystem == "none" && label != "" {
+		return errors.New("a label requires a filesystem")
+	}
+	return nil
+}
+
+func partitionScript(table string) string {
+	if table == "mbr" {
+		return "label: dos\nstart=2048, type=83\n"
+	}
+	return "label: gpt\nstart=2048, type=0FC63DAF-8483-4772-8E79-3D69D8477DE4\n"
+}
+
+func firstPartitionPath(device string) string {
+	if last := device[len(device)-1]; last >= '0' && last <= '9' {
+		return device + "p1"
+	}
+	return device + "1"
 }
 
 func workerDiscover(output io.Writer) error {
@@ -855,19 +968,27 @@ func workerSafety(args []string, output io.Writer) error {
 	if *device == "" || !strings.HasPrefix(*device, "/dev/") {
 		return errors.New("valid device required")
 	}
+	result, err := inspectDeviceSafety(*device)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(output).Encode(result)
+}
+
+func inspectDeviceSafety(device string) (jobs.SafetyResult, error) {
 	result := jobs.SafetyResult{Safe: true}
 	lsblk, err := exec.LookPath("lsblk")
 	if err != nil {
 		result.Safe = false
 		result.Reasons = append(result.Reasons, "lsblk is unavailable")
-		return json.NewEncoder(output).Encode(result)
+		return result, nil
 	}
-	command := exec.Command(lsblk, "--json", "--paths", "--output", "PATH,TYPE,MOUNTPOINTS", *device)
+	command := exec.Command(lsblk, "--json", "--paths", "--output", "PATH,TYPE,MOUNTPOINTS", device)
 	raw, err := command.Output()
 	if err != nil {
 		result.Safe = false
 		result.Reasons = append(result.Reasons, "could not inspect mounts")
-		return json.NewEncoder(output).Encode(result)
+		return result, nil
 	}
 	var tree struct {
 		Blockdevices []struct {
@@ -881,13 +1002,17 @@ func workerSafety(args []string, output io.Writer) error {
 	if json.Unmarshal(raw, &tree) != nil || json.Unmarshal(raw, &generic) != nil {
 		result.Safe = false
 		result.Reasons = append(result.Reasons, "invalid lsblk data")
-		return json.NewEncoder(output).Encode(result)
+		return result, nil
 	}
+	inspectedPaths := make([]string, 0)
 	var walk func(any)
 	walk = func(value any) {
 		node, ok := value.(map[string]any)
 		if !ok {
 			return
+		}
+		if path, ok := node["path"].(string); ok && path != "" {
+			inspectedPaths = append(inspectedPaths, path)
 		}
 		if mountpoints, ok := node["mountpoints"].([]any); ok {
 			for _, point := range mountpoints {
@@ -909,16 +1034,18 @@ func workerSafety(args []string, output io.Writer) error {
 		}
 	}
 	swapRaw, _ := os.ReadFile("/proc/swaps")
-	if strings.Contains(string(swapRaw), *device) {
+	if strings.Contains(string(swapRaw), device) {
 		result.Safe = false
 		result.Reasons = append(result.Reasons, "drive is used for swap")
 	}
-	base := filepath.Base(*device)
-	if holders, holderErr := os.ReadDir(filepath.Join("/sys/class/block", base, "holders")); holderErr == nil && len(holders) > 0 {
-		result.Safe = false
-		result.Reasons = append(result.Reasons, "drive has active device-mapper or RAID holders")
+	for _, path := range inspectedPaths {
+		base := filepath.Base(path)
+		if holders, holderErr := os.ReadDir(filepath.Join("/sys/class/block", base, "holders")); holderErr == nil && len(holders) > 0 {
+			result.Safe = false
+			result.Reasons = append(result.Reasons, path+" has active device-mapper or RAID holders")
+		}
 	}
-	return json.NewEncoder(output).Encode(result)
+	return result, nil
 }
 
 func workerSMARTTest(args []string, output io.Writer) error {

@@ -42,10 +42,71 @@ func (a *api) registerApplicationRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/jobs/{id}/report", a.require(a.generateReport, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/devices/{id}/report", a.require(a.generateDriveReport, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("POST /api/v1/devices/{id}/eject", a.require(a.ejectDevice, core.RoleOperator, core.RoleAdmin))
+	mux.Handle("POST /api/v1/devices/{id}/partition", a.require(a.partitionDevice, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/download", a.require(a.downloadReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/checksum", a.require(a.downloadChecksum, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/reports/{id}/verify", a.require(a.verifyReport, core.RoleViewer, core.RoleOperator, core.RoleAdmin))
 	mux.Handle("GET /api/v1/audit", a.require(a.audit, core.RoleAdmin))
+}
+
+func (a *api) partitionDevice(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var input struct {
+		Table              string `json:"table"`
+		Filesystem         string `json:"filesystem"`
+		Label              string `json:"label"`
+		SerialConfirmation string `json:"serialConfirmation"`
+		ReauthPassword     string `json:"reauthPassword"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	device, ok := a.supervisor.Device(id)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "device not found"})
+		return
+	}
+	if !a.store.Settings().DestructiveEnabled {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "destructive operations are disabled in settings"})
+		return
+	}
+	if device.Probe == nil || device.Probe.Serial == "" || input.SerialConfirmation != device.Probe.Serial {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "serial confirmation does not match the selected drive"})
+		return
+	}
+	user := requestUser(r)
+	if !a.store.VerifyPassword(user.ID, input.ReauthPassword) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "password reauthentication failed"})
+		return
+	}
+	unlock, locked := a.jobs.TryLockDevice(id)
+	if !locked {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "drive has an active test"})
+		return
+	}
+	defer unlock()
+	for _, job := range a.store.Jobs() {
+		if job.DeviceID == id && (job.Status == core.JobQueued || job.Status == core.JobValidating ||
+			job.Status == core.JobRunning || job.Status == core.JobPauseRequested || job.Status == core.JobPaused ||
+			job.Status == core.JobCancelRequested) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "cancel or finish the active test before partitioning this drive"})
+			return
+		}
+	}
+	result, err := a.supervisor.Partition(r.Context(), id, input.Table, input.Filesystem, input.Label)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, guard.ErrDeviceNotFound) {
+			status = http.StatusNotFound
+		}
+		writeJSON(w, status, map[string]string{"error": err.Error()})
+		return
+	}
+	a.store.Audit(user.ID, "device.partition", id, remoteIP(r), map[string]any{
+		"table": input.Table, "filesystem": input.Filesystem, "label": input.Label,
+		"partitionPath": result.PartitionPath,
+	})
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (a *api) ejectDevice(w http.ResponseWriter, r *http.Request) {

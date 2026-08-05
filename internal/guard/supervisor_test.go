@@ -12,13 +12,14 @@ import (
 )
 
 type successfulRunner struct {
-	args []string
-	err  error
+	args   []string
+	output []byte
+	err    error
 }
 
 func (r *successfulRunner) Run(_ context.Context, _ string, args ...string) RunResult {
 	r.args = append([]string(nil), args...)
-	return RunResult{Err: r.err}
+	return RunResult{Output: r.output, Err: r.err}
 }
 
 func (r *successfulRunner) BlockedProcesses() int64 { return 0 }
@@ -98,5 +99,43 @@ func TestFailedEjectKeepsDriveAvailable(t *testing.T) {
 	device, ok := supervisor.Device("sdb")
 	if !ok || device.Status != "ready" {
 		t.Fatalf("failed eject should restore the drive, got %+v", device)
+	}
+}
+
+func TestPartitionRunsIsolatedWorkerAndRestoresReadyState(t *testing.T) {
+	runner := &successfulRunner{output: []byte(`{"devicePath":"/dev/nvme0n1","partitionPath":"/dev/nvme0n1p1","table":"gpt","filesystem":"ext4","label":"Archive"}`)}
+	supervisor := NewSupervisor(runner, "drivarrd", time.Second, 1,
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	supervisor.devices["drive"] = &DeviceState{ID: "drive", Path: "/dev/nvme0n1", Name: "nvme0n1", Status: "ready"}
+
+	result, err := supervisor.Partition(context.Background(), "drive", "gpt", "ext4", "Archive")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"internal-worker", "partition", "--device", "/dev/nvme0n1", "--table", "gpt", "--filesystem", "ext4", "--label", "Archive"}
+	if !slices.Equal(runner.args, want) {
+		t.Fatalf("worker args = %q, want %q", runner.args, want)
+	}
+	if result.PartitionPath != "/dev/nvme0n1p1" {
+		t.Fatalf("partition path = %q", result.PartitionPath)
+	}
+	device, _ := supervisor.Device("drive")
+	if device.Status != "ready" || device.Reason != "" {
+		t.Fatalf("partitioned drive state = %+v", device)
+	}
+}
+
+func TestFailedPartitionKeepsDriveAvailable(t *testing.T) {
+	runner := &successfulRunner{err: errors.New("mounted at /data")}
+	supervisor := NewSupervisor(runner, "drivarrd", time.Second, 1,
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	supervisor.devices["drive"] = &DeviceState{ID: "drive", Path: "/dev/sdb", Status: "ready"}
+
+	if _, err := supervisor.Partition(context.Background(), "drive", "gpt", "ext4", ""); err == nil {
+		t.Fatal("expected partition failure")
+	}
+	device, _ := supervisor.Device("drive")
+	if device.Status != "ready" {
+		t.Fatalf("failed partition should restore drive, got %+v", device)
 	}
 }

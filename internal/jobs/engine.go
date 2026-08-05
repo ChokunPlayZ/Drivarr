@@ -295,6 +295,22 @@ func (e *Engine) lockDevice(id string) func() {
 	return lock.Unlock
 }
 
+// TryLockDevice reserves a drive against test execution for a short
+// maintenance operation. It never waits behind a running test.
+func (e *Engine) TryLockDevice(id string) (func(), bool) {
+	e.deviceMu.Lock()
+	lock := e.deviceLocks[id]
+	if lock == nil {
+		lock = &sync.Mutex{}
+		e.deviceLocks[id] = lock
+	}
+	e.deviceMu.Unlock()
+	if !lock.TryLock() {
+		return nil, false
+	}
+	return lock.Unlock, true
+}
+
 func (e *Engine) runChunked(ctx context.Context, job *core.Job) {
 	for offset := job.CompletedBytes; offset < job.TotalBytes; {
 		current, _ := e.store.Job(job.ID)

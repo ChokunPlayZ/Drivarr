@@ -3,7 +3,7 @@ Version: @VERSION@
 Section: admin
 Priority: optional
 Architecture: @ARCH@
-Depends: smartmontools, fio, e2fsprogs, udisks2, systemd
+Depends: smartmontools, fio, e2fsprogs, util-linux, parted, udisks2, systemd
 Maintainer: Drivarr
 Description: Lockup-resistant web drive diagnostics
  SMART, Seagate FARM, speed, surface, and destructive verification tests with

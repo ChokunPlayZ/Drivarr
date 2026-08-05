@@ -23,7 +23,7 @@ export const StatusChip: React.FC<StatusChipProps> = ({ value, label, size = 'sm
   if (['healthy', 'completed', 'passed', 'pass', 'consistent'].includes(status)) {
     color = 'success';
     icon = <CheckCircleOutlinedIcon fontSize="small" />;
-  } else if (['running', 'validating', 'active'].includes(status)) {
+  } else if (['running', 'validating', 'active', 'partitioning'].includes(status)) {
     color = 'primary';
     icon = <PlayCircleOutlinedIcon fontSize="small" />;
   } else if (['paused', 'pause_requested'].includes(status)) {
